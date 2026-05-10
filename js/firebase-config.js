@@ -16,18 +16,20 @@
    made by 박선생
 ========================================================= */
 
-const FIREBASE_CONFIG = {
-  apiKey:            "여기에 apiKey 입력",
-  authDomain:        "여기에 authDomain 입력",
-  databaseURL:       "여기에 databaseURL 입력",   // ← 필수! https://...firebaseio.com 형식
-  projectId:         "여기에 projectId 입력",
-  storageBucket:     "여기에 storageBucket 입력",
-  messagingSenderId: "여기에 messagingSenderId 입력",
-  appId:             "여기에 appId 입력"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyAM9g8Mezj-sd3vU3wE_Nfa2eFEy7F2RD8",
+    authDomain: "nation-game-f4032.firebaseapp.com",
+    databaseURL: "https://nation-game-f4032-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "nation-game-f4032",
+    storageBucket: "nation-game-f4032.firebasestorage.app",
+    messagingSenderId: "969425712284",
+    appId: "1:969425712284:web:7694efd12e442c26336959",
+    measurementId: "G-E6BM6KQM34"
+  };
+
 
 /* ─── 설정 완료 여부 자동 확인 ─────────────────────── */
 const FIREBASE_CONFIGURED = (
-  FIREBASE_CONFIG.apiKey !== "여기에 apiKey 입력" &&
+  FIREBASE_CONFIG.apiKey !== "AIzaSyAM9g8Mezj-sd3vU3wE_Nfa2eFEy7F2RD8" &&
   FIREBASE_CONFIG.databaseURL.includes("firebaseio.com")
 );
