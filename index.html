@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>나라 경영 시뮬레이션 - 기후와 문명</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div id="watermark">made by 박선생</div>
+  <canvas id="stars"></canvas>
+  <div id="app"></div>
+
+  <!-- Firebase SDK (Realtime Database) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <!-- 로드 순서: constants → engine → ui → screens → firebase-config → online → main -->
+  <script src="./js/constants.js"></script>
+  <script src="./js/engine.js"></script>
+  <script src="./js/ui.js"></script>
+  <script src="./js/screens.js"></script>
+  <script src="./js/firebase-config.js"></script>
+  <script src="./js/online.js"></script>
+  <script src="./js/main.js"></script>
+</body>
+</html>
