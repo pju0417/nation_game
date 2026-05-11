@@ -16,16 +16,16 @@
    made by 박선생
 ========================================================= */
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyAM9g8Mezj-sd3vU3wE_Nfa2eFEy7F2RD8",
-    authDomain: "nation-game-f4032.firebaseapp.com",
-    databaseURL: "https://nation-game-f4032-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "nation-game-f4032",
-    storageBucket: "nation-game-f4032.firebasestorage.app",
-    messagingSenderId: "969425712284",
-    appId: "1:969425712284:web:7694efd12e442c26336959",
-    measurementId: "G-E6BM6KQM34"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyAM9g8Mezj-sd3vU3wE_Nfa2eFEy7F2RD8",
+  authDomain: "nation-game-f4032.firebaseapp.com",
+  databaseURL: "https://nation-game-f4032-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "nation-game-f4032",
+  storageBucket: "nation-game-f4032.firebasestorage.app",
+  messagingSenderId: "969425712284",
+  appId: "1:969425712284:web:7694efd12e442c26336959",
+  measurementId: "G-E6BM6KQM34"
+};
 
 
 /* ─── 설정 완료 여부 자동 확인 ─────────────────────── */
