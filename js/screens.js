@@ -23,7 +23,7 @@ function renderMenu() {
 
     '<button class="menu-btn menu-primary" onclick="selectMode(\'solo\')">🌐 혼자 하기 (솔로 플레이)</button>',
     '<button class="menu-btn" onclick="selectMode(\'multi\')">👥 같이 하기 (한 기기 · 2~6인)</button>',
-    '<button class="menu-btn" style="border-color:rgba(100,160,255,0.5);color:#80b8ff;background:rgba(100,160,255,0.06);" onclick="G.phase=\'ol-menu\';G._olTab=\'create\';render()">🌏 온라인 대전 (다른 기기 · 2~6인)</button>',
+    '<button class="menu-btn" style="border-color:rgba(100,160,255,0.5);color:#80b8ff;background:rgba(100,160,255,0.06);" onclick="goOnline()">🌏 온라인 대전 (다른 기기 · 2~6인)</button>',
     '<button class="menu-btn" onclick="goHelp()" style="font-size:0.9em;border-color:rgba(240,192,64,0.2);">📖 도움말 · 게임 규칙</button>',
 
     '<div style="margin-top:28px;font-size:0.75em;color:var(--text2);letter-spacing:0.5px;">',
@@ -546,7 +546,7 @@ function renderEvents() {
 
   html += '</div>';
   html += '<div style="text-align:center;">';
-  html += '<button class="btn btn-primary" onclick="G.phase=\'summary\';render()">📊 이번 턴 결과 보기 →</button>';
+  html += '<button class="btn btn-primary" onclick="goPhase(\'summary\')">📊 이번 턴 결과 보기 →</button>';
   html += '</div>';
   html += '</div></div>';
   return html;
@@ -611,7 +611,7 @@ function renderSummary() {
 
   html += '<div style="text-align:center;">';
   if (turnsLeft === 0) {
-    html += '<button class="btn btn-primary" onclick="G.phase=\'results\';render()" style="font-size:1.05em;padding:14px 40px;">🏆 최종 결과 보기</button>';
+    html += '<button class="btn btn-primary" onclick="goPhase(\'results\')" style="font-size:1.05em;padding:14px 40px;">🏆 최종 결과 보기</button>';
   } else {
     html += '<button class="btn btn-primary" onclick="nextTurn()" style="font-size:1.05em;padding:14px 40px;">다음 턴으로 (' + (G.turn + 1) + '/' + G.maxTurns + ') →</button>';
   }

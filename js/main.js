@@ -121,7 +121,10 @@ function selectMode(m) {
 }
 
 function goHelp()  { G.phase = 'help';  render(); }
-function goMenu()  { G.phase = 'menu';  render(); }
+function goMenu()   { G.phase = 'menu';   render(); }
+function goOnline() { G.phase = 'ol-menu'; G._olTab = 'create'; render(); }
+function olTab(t)   { G._olTab = t; render(); }
+function goPhase(p) { G.phase = p; render(); }
 function startTurn(){ G.phase = 'playerTurn'; render(); }
 
 function restartGame() {

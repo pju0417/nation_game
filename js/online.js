@@ -534,8 +534,8 @@ function renderOnlineMenu() {
   /* 탭 */
   var tabSel = G._olTab || 'create';
   html += '<div class="tabs" style="margin-bottom:16px;">';
-  html += '<div class="tab' + (tabSel==='create'?' active':'') + '" onclick="G._olTab=\'create\';render()">🏠 방 만들기</div>';
-  html += '<div class="tab' + (tabSel==='join'  ?' active':'') + '" onclick="G._olTab=\'join\';render()">🚪 방 참가하기</div>';
+  html += '<div class="tab' + (tabSel==='create'?' active':'') + '" onclick="olTab(\'create\')">🏠 방 만들기</div>';
+  html += '<div class="tab' + (tabSel==='join'  ?' active':'') + '" onclick="olTab(\'join\')">🚪 방 참가하기</div>';
   html += '</div>';
 
   /* 기후 선택 옵션 공통 */
