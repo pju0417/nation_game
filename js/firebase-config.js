@@ -29,7 +29,8 @@ const firebaseConfig = {
 
 
 /* ─── 설정 완료 여부 자동 확인 ─────────────────────── */
-const FIREBASE_CONFIGURED = (
-  firebaseConfig.apiKey !== "여기에 apiKey 입력" &&
-  firebaseConfig.databaseURL.includes("firebaseio.com")
+const FIREBASE_CONFIGURED = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.databaseURL &&
+  firebaseConfig.projectId
 );
