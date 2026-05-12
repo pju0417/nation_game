@@ -30,6 +30,6 @@ const firebaseConfig = {
 
 /* ─── 설정 완료 여부 자동 확인 ─────────────────────── */
 const FIREBASE_CONFIGURED = (
-  FIREBASE_CONFIG.apiKey !== "AIzaSyAM9g8Mezj-sd3vU3wE_Nfa2eFEy7F2RD8" &&
-  FIREBASE_CONFIG.databaseURL.includes("firebaseio.com")
+  firebaseConfig.apiKey !== "여기에 apiKey 입력" &&
+  firebaseConfig.databaseURL.includes("firebaseio.com")
 );
