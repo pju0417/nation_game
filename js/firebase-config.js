@@ -16,7 +16,7 @@
    made by 박선생
 ========================================================= */
 
-const firebaseConfig = {
+const FIREBASE_CONFIG = {
   apiKey: "AIzaSyAM9g8Mezj-sd3vU3wE_Nfa2eFEy7F2RD8",
   authDomain: "nation-game-f4032.firebaseapp.com",
   databaseURL: "https://nation-game-f4032-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -27,10 +27,8 @@ const firebaseConfig = {
   measurementId: "G-E6BM6KQM34"
 };
 
-
-/* ─── 설정 완료 여부 자동 확인 ─────────────────────── */
 const FIREBASE_CONFIGURED = Boolean(
-  firebaseConfig.apiKey &&
-  firebaseConfig.databaseURL &&
-  firebaseConfig.projectId
+  FIREBASE_CONFIG.apiKey &&
+  FIREBASE_CONFIG.databaseURL &&
+  FIREBASE_CONFIG.projectId
 );
