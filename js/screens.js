@@ -392,7 +392,7 @@ function renderBuildTab(p) {
     var selected = G.selBuild === b.id;
 
     html += '<div class="card' + (selected ? ' selected' : '') + (disabled ? ' disabled' : '') + '"';
-    if (!disabled) html += ' onclick="selBuild(\'' + b.id + '\')"';
+    if (!disabled) html += ' onclick="selBuild(\'\' + b.id + \'\')"';
     html += ' style="margin-bottom:8px;">';
 
     html += '<div style="display:flex;align-items:center;gap:8px;">';
@@ -434,7 +434,7 @@ function renderResearchTab(p) {
     var selected   = G.selTech === t.id;
 
     html += '<div class="card' + (selected ? ' selected' : '') + (disabled ? ' disabled' : '') + '"';
-    if (!disabled) html += ' onclick="selTech(\'' + t.id + '\')"';
+    if (!disabled) html += ' onclick="selTech(\'\' + t.id + \'\')"';
     html += ' style="margin-bottom:8px;">';
 
     html += '<div style="display:flex;align-items:center;gap:8px;">';
@@ -465,7 +465,7 @@ function renderPolicyTab() {
 
   POLICIES.forEach(function(pol) {
     var selected = G.selPolicy === pol.id;
-    html += '<div class="card' + (selected ? ' selected' : '') + '" onclick="selPolicy(\'' + pol.id + '\')"';
+    html += '<div class="card' + (selected ? ' selected' : '') + '" onclick="selPolicy(\'\' + pol.id + \'\')"';
     html += ' style="border-color:' + (selected ? pol.color : 'rgba(255,255,255,0.08)') + ';">';
     html += '<div style="font-size:1.7em;margin-bottom:4px;">' + pol.emoji + '</div>';
     html += '<div style="font-weight:700;font-size:0.84em;">' + pol.name + '</div>';
