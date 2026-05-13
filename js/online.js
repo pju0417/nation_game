@@ -251,6 +251,7 @@ function listenLobby() {
 function listenGame() {
   offAll();
   OL.listeners.push(OL.roomRef);
+  OL._processing = false; /* 중복 처리 방지 플래그 */
 
   OL.roomRef.on('value', function (snap) {
     var data = snap.val();
@@ -264,10 +265,25 @@ function listenGame() {
     list.sort(function (a, b) { return a.id - b.id; });
     G.players = list;
 
+    /* ★ 핵심 수정: 호스트가 리스너에서 '모든 제출 완료'를 직접 감지 */
+    if (OL.isHost && data.phase === 'playing' && !OL._processing) {
+      var playerList = Object.values(data.players || {});
+      var allSubmitted = playerList.length > 0 && playerList.every(function (p) {
+        return p.submitted === true;
+      });
+      if (allSubmitted) {
+        OL._processing = true; /* 중복 실행 방지 */
+        hostProcessTurn(data);
+        return;
+      }
+    }
+
+    /* 이벤트 화면으로 전환 */
     if (data.phase === 'events' && G.phase !== 'ol-events') {
-      G.turnLog    = data.turnLog ? Object.values(data.turnLog) : [];
-      OL.submitted = false;
-      G.phase      = 'ol-events';
+      G.turnLog      = data.turnLog ? Object.values(data.turnLog) : [];
+      OL.submitted   = false;
+      OL._processing = false;
+      G.phase        = 'ol-events';
       render();
       return;
     }
@@ -288,25 +304,20 @@ function listenGame() {
 }
 
 /* ─── 턴 제출 ────────────────────────────────────── */
+/*
+  ★ 수정: transaction 제거.
+  각 플레이어가 자신의 action + submitted=true 만 Firebase에 씁니다.
+  호스트는 listenGame 리스너에서 모든 플레이어의 submitted 를 감지해
+  자동으로 hostProcessTurn 을 호출합니다.
+*/
 function olSubmitTurn() {
   if (OL.submitted) return;
   OL.submitted = true;
 
   var action = { build: G.selBuild, research: G.selTech, policy: G.selPolicy };
-  OL.roomRef.child('players/' + OL.myPlayerId + '/action').set(action);
-  OL.roomRef.child('players/' + OL.myPlayerId + '/submitted').set(true);
-
-  OL.roomRef.child('submittedCount').transaction(function (cur) {
-    return (cur || 0) + 1;
-  }).then(function (result) {
-    var count = result.snapshot.val();
-    if (OL.isHost) {
-      OL.roomRef.once('value').then(function (snap) {
-        var data  = snap.val();
-        var total = Object.keys(data.players || {}).length;
-        if (count >= total) hostProcessTurn(data);
-      });
-    }
+  OL.roomRef.child('players/' + OL.myPlayerId).update({
+    action:    action,
+    submitted: true
   });
 
   G.selBuild  = null;
