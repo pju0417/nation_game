@@ -270,7 +270,9 @@ function ensureButtonMapStyles() {
     '}' +
 
     '.hex-tile-btn:hover{transform:translateY(-2px) scale(1.035);filter:brightness(1.12);z-index:40!important;}' +
-    '.hex-tile-btn:focus-visible{outline:3px solid #f0c040;outline-offset:2px;z-index:45!important;}' +
+    '.hex-tile-btn:focus,.hex-tile-btn:focus-visible{' +
+    'outline:none;' +
+    '}' +
 
     '.hex-tile-btn.owned{' +
       'background:var(--tile-color);' +
