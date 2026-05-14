@@ -183,141 +183,231 @@ function renderCover() {
 
 /* ─── 플레이어 턴 메인 ───────────────────────────── */
 function renderPlayerTurn() {
-  var p              = G.players[G.curPlayer];
-  var cl             = CLIMATES[p.climate];
-  var gain           = totalGain(p);
-  var gainWithPolicy = applyPolicy(Object.assign({},gain), G.selPolicy);
+  var p = G.players[G.curPlayer];
+  var cl = CLIMATES[p.climate];
+  var gain = totalGain(p);
+  var gainWithPolicy = applyPolicy(Object.assign({}, gain), G.selPolicy);
+
   calcScore(p);
 
-  var selBuildDef  = G.selBuild  ? BUILDINGS.find(function(x){ return x.id===G.selBuild;  }) : null;
-  var selTechDef   = G.selTech   ? TECHS.find(function(x){     return x.id===G.selTech;   }) : null;
-  var selPolicyDef = G.selPolicy ? POLICIES.find(function(x){  return x.id===G.selPolicy; }) : null;
+  var selBuildDef = G.selBuild
+    ? BUILDINGS.find(function(x) { return x.id === G.selBuild; })
+    : null;
 
-  var sortedPlayers = G.players.slice().sort(function(a,b){ return b.scores.total-a.scores.total; });
+  var selTechDef = G.selTech
+    ? TECHS.find(function(x) { return x.id === G.selTech; })
+    : null;
 
-  var myTrades = (G.pendingTrades||[]).filter(function(t){ return t.toId===p.id&&t.status==='pending'; });
-  var myDiplos = (G.pendingDiplo||[]).filter(function(d){ return d.toId===p.id&&d.status==='pending'; });
+  var selPolicyDef = G.selPolicy
+    ? POLICIES.find(function(x) { return x.id === G.selPolicy; })
+    : null;
+
+  var sortedPlayers = G.players.slice().sort(function(a, b) {
+    return b.scores.total - a.scores.total;
+  });
+
+  var myTrades = (G.pendingTrades || []).filter(function(t) {
+    return t.toId === p.id && t.status === 'pending';
+  });
+
+  var myDiplos = (G.pendingDiplo || []).filter(function(d) {
+    return d.toId === p.id && d.status === 'pending';
+  });
+
   var pendingCount = myTrades.length + myDiplos.length;
 
-  var html = '<div style="background:var(--bg);min-height:100vh;">';
+  var html = '';
+
+  html += '<div class="game-screen-map-layout" style="background:var(--bg);min-height:100vh;">';
 
   /* 상단 바 */
   html += '<div class="topbar">';
   html += '<div style="display:flex;align-items:center;gap:10px;">';
-  html += '<span style="font-size:1.4em;">'+p.emoji+'</span>';
+  html += '<span style="font-size:1.4em;">' + p.emoji + '</span>';
   html += '<div>';
-  html += '<div style="font-weight:700;">'+p.name+' <span style="color:'+cl.color+';font-size:0.85em;">'+cl.emoji+' '+p.country+'</span></div>';
-  html += '<div style="font-size:0.74em;color:var(--text2);">⚔️'+p.military+' · 👥'+p.population+(p.allies&&p.allies.length?' · 🤝동맹'+p.allies.length:'')+'</div>';
-  html += '</div></div>';
-  html += '<div style="text-align:center;"><div class="turn-num">턴 '+G.turn+' / '+G.maxTurns+'</div>';
-  html += '<div style="font-size:0.7em;color:var(--text2);">남은 '+( G.maxTurns-G.turn)+'턴</div></div>';
-  html += '<div style="text-align:right;"><div style="font-size:0.7em;color:var(--text2);">종합 국력</div><div class="turn-num">'+p.scores.total+'</div></div>';
+  html += '<div style="font-weight:700;">' + p.name + ' <span style="color:' + cl.color + ';font-size:0.85em;">' + cl.emoji + ' ' + p.country + '</span></div>';
+  html += '<div style="font-size:0.74em;color:var(--text2);">⚔️' + p.military + ' · 👥' + p.population + (p.allies && p.allies.length ? ' · 🤝동맹' + p.allies.length : '') + '</div>';
+  html += '</div>';
   html += '</div>';
 
-  /* 세계지도 */
-  html += '<div style="padding:10px 10px 0;">';
-  html += '<canvas id="worldMap" width="760" height="420" style="width:100%;border-radius:8px;border:1px solid rgba(240,192,64,0.18);display:block;"></canvas>';
+  html += '<div style="text-align:center;">';
+  html += '<div class="turn-num">턴 ' + G.turn + ' / ' + G.maxTurns + '</div>';
+  html += '<div style="font-size:0.7em;color:var(--text2);">남은 ' + (G.maxTurns - G.turn) + '턴</div>';
   html += '</div>';
 
-  html += '<div class="game-grid">';
+  html += '<div style="text-align:right;">';
+  html += '<div style="font-size:0.7em;color:var(--text2);">종합 국력</div>';
+  html += '<div class="turn-num">' + p.scores.total + '</div>';
+  html += '</div>';
+  html += '</div>';
 
-  /* 왼쪽 */
-  html += '<div class="col">';
-  html += '<div class="panel"><div class="section-title">📦 보유 자원</div>';
-  ['food','production','gold','science','culture'].forEach(function(k){
+  /*
+    새 배치:
+    왼쪽: 현재 국가 정보
+    가운데: 지도
+    오른쪽: 선택창
+  */
+  html += '<div class="map-play-grid">';
+
+  /* 왼쪽 정보 패널 */
+  html += '<div class="map-side-col map-info-col">';
+
+  html += '<div class="panel">';
+  html += '<div class="section-title">📦 보유 자원</div>';
+
+  ['food', 'production', 'gold', 'science', 'culture'].forEach(function(k) {
     html += resPreviewRow(k, p.resources[k], gainWithPolicy[k]);
   });
+
   html += '</div>';
 
-  html += '<div class="panel" style="border-color:'+cl.color+'44;">';
-  html += '<div class="section-title">'+cl.emoji+' '+cl.name+' 기후</div>';
-  html += '<div style="font-size:0.78em;color:var(--text2);margin-bottom:4px;">'+cl.desc+'</div>';
-  html += '<div style="font-size:0.77em;color:#80e890;">'+cl.perk+'</div>';
-  html += '<div style="font-size:0.77em;color:#f09090;">'+cl.weakness+'</div>';
+  html += '<div class="panel" style="border-color:' + cl.color + '44;">';
+  html += '<div class="section-title">' + cl.emoji + ' ' + cl.name + ' 기후</div>';
+  html += '<div style="font-size:0.78em;color:var(--text2);margin-bottom:4px;">' + cl.desc + '</div>';
+  html += '<div style="font-size:0.77em;color:#80e890;">' + cl.perk + '</div>';
+  html += '<div style="font-size:0.77em;color:#f09090;">' + cl.weakness + '</div>';
   html += '</div>';
 
   var bc = buildCount(p);
-  html += '<div class="panel"><div class="section-title">🏗️ 건물 ('+p.buildings.length+')</div>';
-  if (p.buildings.length===0) { html += '<div style="color:var(--text2);font-size:0.82em;">아직 없음</div>'; }
-  else {
+
+  html += '<div class="panel">';
+  html += '<div class="section-title">🏗️ 건물 (' + p.buildings.length + ')</div>';
+
+  if (p.buildings.length === 0) {
+    html += '<div style="color:var(--text2);font-size:0.82em;">아직 없음</div>';
+  } else {
     var bShown = {};
-    p.buildings.forEach(function(id){
-      if (!bShown[id]){ bShown[id]=true;
-        var b=BUILDINGS.find(function(x){return x.id===id;});
-        if (b) html += '<div style="font-size:0.82em;padding:2px 0;">'+b.emoji+' '+b.name+(bc[id]>1?' x'+bc[id]:'')+'</div>';
+
+    p.buildings.forEach(function(id) {
+      if (!bShown[id]) {
+        bShown[id] = true;
+
+        var b = BUILDINGS.find(function(x) {
+          return x.id === id;
+        });
+
+        if (b) {
+          html += '<div style="font-size:0.82em;padding:2px 0;">' + b.emoji + ' ' + b.name + (bc[id] > 1 ? ' x' + bc[id] : '') + '</div>';
+        }
       }
     });
   }
+
   html += '</div>';
 
-  html += '<div class="panel"><div class="section-title">🔬 기술 ('+p.techs.length+')</div>';
-  if (p.techs.length===0) { html += '<div style="color:var(--text2);font-size:0.82em;">아직 없음</div>'; }
-  else {
-    p.techs.forEach(function(id){
-      var t=TECHS.find(function(x){return x.id===id;});
-      if (t) html += '<div style="font-size:0.82em;padding:2px 0;">'+t.emoji+' '+t.name+'</div>';
+  html += '<div class="panel">';
+  html += '<div class="section-title">🔬 기술 (' + p.techs.length + ')</div>';
+
+  if (p.techs.length === 0) {
+    html += '<div style="color:var(--text2);font-size:0.82em;">아직 없음</div>';
+  } else {
+    p.techs.forEach(function(id) {
+      var t = TECHS.find(function(x) {
+        return x.id === id;
+      });
+
+      if (t) {
+        html += '<div style="font-size:0.82em;padding:2px 0;">' + t.emoji + ' ' + t.name + '</div>';
+      }
     });
   }
-  html += '</div>';
-  html += '</div>'; /* 왼쪽 끝 */
 
-  /* 중앙 탭 */
-  html += '<div class="col">';
+  html += '</div>';
+
+  html += '</div>';
+
+  /* 가운데 지도 */
+  html += '<div class="map-center-col">';
+  html += '<div id="worldMapButtonHost"></div>';
+  html += '</div>';
+
+  /* 오른쪽 선택 패널 */
+  html += '<div class="map-side-col map-action-col">';
+
   html += '<div class="panel" style="padding:0;overflow:hidden;">';
+
   html += '<div class="tabs" style="padding:0 8px;overflow-x:auto;white-space:nowrap;">';
-  html += '<div class="tab'+(G.tab==='build'   ?' active':'')+'" onclick="tabBuild()">🏗️ 건설</div>';
-  html += '<div class="tab'+(G.tab==='research'?' active':'')+'" onclick="tabResearch()">🔬 연구</div>';
-  html += '<div class="tab'+(G.tab==='policy'  ?' active':'')+'" onclick="tabPolicy()">📜 정책</div>';
-  html += '<div class="tab'+(G.tab==='diplo'   ?' active':'')+'" onclick="tabDiplo()">';
-  html += '🤝 외교' + (pendingCount>0?'<span style="background:#e05050;color:#fff;border-radius:10px;padding:1px 5px;font-size:0.65em;margin-left:4px;">'+pendingCount+'</span>':'');
+  html += '<div class="tab' + (G.tab === 'build' ? ' active' : '') + '" onclick="tabBuild()">🏗️ 건설</div>';
+  html += '<div class="tab' + (G.tab === 'research' ? ' active' : '') + '" onclick="tabResearch()">🔬 연구</div>';
+  html += '<div class="tab' + (G.tab === 'policy' ? ' active' : '') + '" onclick="tabPolicy()">📜 정책</div>';
+
+  html += '<div class="tab' + (G.tab === 'diplo' ? ' active' : '') + '" onclick="tabDiplo()">';
+  html += '🤝 외교' + (pendingCount > 0 ? '<span style="background:#e05050;color:#fff;border-radius:10px;padding:1px 5px;font-size:0.65em;margin-left:4px;">' + pendingCount + '</span>' : '');
   html += '</div>';
-  html += '<div class="tab'+(G.tab==='scores'  ?' active':'')+'" onclick="tabScores()">📊 국력</div>';
+
+  html += '<div class="tab' + (G.tab === 'scores' ? ' active' : '') + '" onclick="tabScores()">📊 국력</div>';
   html += '</div>';
+
   html += '<div style="padding:12px;">';
-  if (G.tab==='build')    html += renderBuildTab(p);
-  if (G.tab==='research') html += renderResearchTab(p);
-  if (G.tab==='policy')   html += renderPolicyTab();
-  if (G.tab==='diplo')    html += renderDiploTab(p);
-  if (G.tab==='scores')   html += renderScoresTab(p);
-  html += '</div></div>';
+
+  if (G.tab === 'build') html += renderBuildTab(p);
+  if (G.tab === 'research') html += renderResearchTab(p);
+  if (G.tab === 'policy') html += renderPolicyTab();
+  if (G.tab === 'diplo') html += renderDiploTab(p);
+  if (G.tab === 'scores') html += renderScoresTab(p);
+
+  html += '</div>';
+  html += '</div>';
 
   /* 결정 요약 */
   html += '<div class="panel" style="background:rgba(240,192,64,0.04);border-color:rgba(240,192,64,0.28);">';
   html += '<div class="section-title">✅ 이번 턴 결정</div>';
-  html += '<div class="grid3" style="gap:8px;margin-bottom:12px;">';
-  html += '<div style="text-align:center;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;"><div style="color:var(--text2);font-size:0.76em;">건설</div><div style="font-weight:700;font-size:0.85em;color:'+(selBuildDef?'var(--gold)':'var(--text2)')+'">'+(selBuildDef?selBuildDef.emoji+' '+selBuildDef.name:'선택 안 함')+'</div></div>';
-  html += '<div style="text-align:center;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;"><div style="color:var(--text2);font-size:0.76em;">연구</div><div style="font-weight:700;font-size:0.85em;color:'+(selTechDef?'var(--gold)':'var(--text2)')+'">'+(selTechDef?selTechDef.emoji+' '+selTechDef.name:'선택 안 함')+'</div></div>';
-  html += '<div style="text-align:center;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;"><div style="color:var(--text2);font-size:0.76em;">정책</div><div style="font-weight:700;font-size:0.85em;color:'+(selPolicyDef?'var(--gold)':'var(--text2)')+'">'+(selPolicyDef?selPolicyDef.emoji+' '+selPolicyDef.name:'선택 안 함')+'</div></div>';
+
+  html += '<div class="decision-grid">';
+
+  html += '<div class="decision-box">';
+  html += '<div class="decision-label">건설</div>';
+  html += '<div class="decision-value" style="color:' + (selBuildDef ? 'var(--gold)' : 'var(--text2)') + ';">';
+  html += selBuildDef ? selBuildDef.emoji + ' ' + selBuildDef.name : '선택 안 함';
   html += '</div>';
+  html += '</div>';
+
+  html += '<div class="decision-box">';
+  html += '<div class="decision-label">연구</div>';
+  html += '<div class="decision-value" style="color:' + (selTechDef ? 'var(--gold)' : 'var(--text2)') + ';">';
+  html += selTechDef ? selTechDef.emoji + ' ' + selTechDef.name : '선택 안 함';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="decision-box">';
+  html += '<div class="decision-label">정책</div>';
+  html += '<div class="decision-value" style="color:' + (selPolicyDef ? 'var(--gold)' : 'var(--text2)') + ';">';
+  html += selPolicyDef ? selPolicyDef.emoji + ' ' + selPolicyDef.name : '선택 안 함';
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>';
+
   html += '<button class="btn btn-primary btn-block" onclick="submitTurn()">턴 종료 →</button>';
   html += '</div>';
-  html += '</div>'; /* 중앙 끝 */
 
-  /* 오른쪽: 순위 */
-  html += '<div class="col">';
-  html += '<div class="panel"><div class="section-title">🏆 현재 순위</div>';
+  /* 순위 정보는 오른쪽 하단으로 이동 */
+  html += '<div class="panel">';
+  html += '<div class="section-title">🏆 현재 순위</div>';
+
   sortedPlayers.forEach(function(sp, idx) {
-    var isSelf = sp.id===p.id;
-    var cl2    = CLIMATES[sp.climate];
-    var rankColor = idx===0?'#f0c040':idx===1?'#c0c0c0':idx===2?'#c08040':'var(--text2)';
-    html += '<div style="display:flex;align-items:center;gap:7px;padding:5px;border-bottom:1px solid rgba(255,255,255,0.05);'+(isSelf?'background:rgba(240,192,64,0.06);border-radius:5px;':'')+'">';
-    html += '<span style="font-weight:900;width:22px;text-align:center;color:'+rankColor+';">'+(idx+1)+'</span>';
-    html += '<span>'+sp.emoji+'</span>';
+    var isSelf = sp.id === p.id;
+    var cl2 = CLIMATES[sp.climate];
+    var rankColor = idx === 0 ? '#f0c040' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#c08040' : 'var(--text2)';
+
+    html += '<div style="display:flex;align-items:center;gap:7px;padding:5px;border-bottom:1px solid rgba(255,255,255,0.05);' + (isSelf ? 'background:rgba(240,192,64,0.06);border-radius:5px;' : '') + '">';
+    html += '<span style="font-weight:900;width:22px;text-align:center;color:' + rankColor + ';">' + (idx + 1) + '</span>';
+    html += '<span>' + sp.emoji + '</span>';
     html += '<div style="flex:1;min-width:0;">';
-    html += '<div style="font-size:0.82em;font-weight:'+(isSelf?700:400)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+sp.name+'</div>';
-    html += '<div style="font-size:0.72em;color:'+cl2.color+';">'+cl2.emoji+' '+sp.country+'</div>';
+    html += '<div style="font-size:0.82em;font-weight:' + (isSelf ? 700 : 400) + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + sp.name + '</div>';
+    html += '<div style="font-size:0.72em;color:' + cl2.color + ';">' + cl2.emoji + ' ' + sp.country + '</div>';
     html += '</div>';
-    html += '<span style="font-weight:700;color:var(--gold);font-size:0.9em;">'+sp.scores.total+'</span>';
+    html += '<span style="font-weight:700;color:var(--gold);font-size:0.9em;">' + sp.scores.total + '</span>';
     html += '</div>';
   });
+
   html += '</div>';
 
-  html += '<div class="panel"><div class="section-title">🌍 다른 나라</div>';
-  G.players.forEach(function(op){ if(op.id!==p.id) html+=miniCard(op); });
   html += '</div>';
-  html += '</div>'; /* 오른쪽 끝 */
-  html += '</div>'; /* game-grid 끝 */
+
   html += '</div>';
+  html += '</div>';
+
   return html;
 }
 
