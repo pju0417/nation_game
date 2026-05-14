@@ -1,27 +1,32 @@
 /* =========================================================
    나라 경영 시뮬레이션 · map.js
-   PC 고화질 + 턴 수에 따라 크기가 변하는 선택형 육각 타일 지도
+   PC 고화질 + 대형 문명식 선택형 육각 타일 지도
    made by 박선생
+
+   적용 방법:
+   - GitHub 저장소에서 js/map.js 파일을 연다.
+   - 기존 내용을 전부 삭제한다.
+   - 이 코드 전체를 붙여넣는다.
+   - Commit changes 한다.
 
    핵심 기능:
    1. PC 환경 고해상도 Canvas 렌더링
    2. G.maxTurns 값에 따라 지도 크기 변경
-      - 15턴: 소형 지도
-      - 20턴: 표준 지도
-      - 30턴: 대형 지도
+      - 15턴: 확장형 소형 지도
+      - 20턴: 대형 표준 지도
+      - 30턴: 초대형 장기 지도
    3. 육각형 하나하나를 MAP_TILES 데이터 객체로 생성
    4. Canvas 클릭 좌표를 실제 타일 데이터와 연결
    5. 선택한 타일 강조 + 정보창 표시
-   6. 기존 index.html 수정 없이 scheduleMapDraw() 유지
+   6. 국가별 영토 색상과 테두리 강화
+   7. 기존 index.html 수정 없이 scheduleMapDraw() 유지
 ========================================================= */
 
 /* ─── 기본 상수 ─────────────────────────────────── */
 var MAP_W = 760;
 var MAP_H = 420;
 
-var BASE_HEX_SIZE = 27;
 var HEX_GAP = 1.4;
-
 var MAP_OFFSET_X = 70;
 var MAP_OFFSET_Y = 54;
 
@@ -43,115 +48,89 @@ var _mapClickBoundCanvas = null;
 /* ─── 타일 지형 정의 ─────────────────────────────── */
 var TILE_TYPES = {
   o: {
-    id:'ocean',
-    name:'바다',
-    color:'#12395f',
-    edge:'#1e5a88',
-    icon:'≈',
-    yield:{ gold:1 },
-    buildable:false
+    id: 'ocean',
+    name: '바다',
+    color: '#12395f',
+    edge: '#1e5a88',
+    icon: '≈',
+    yield: { gold: 1 },
+    buildable: false
   },
   t: {
-    id:'tundra',
-    name:'설원',
-    color:'#9fc7d7',
-    edge:'#d4eef8',
-    icon:'❄',
-    yield:{ science:1, production:1 },
-    buildable:true
+    id: 'tundra',
+    name: '설원',
+    color: '#9fc7d7',
+    edge: '#d4eef8',
+    icon: '❄',
+    yield: { science: 1, production: 1 },
+    buildable: true
   },
   p: {
-    id:'plains',
-    name:'초원',
-    color:'#3f8d3d',
-    edge:'#66c466',
-    icon:'·',
-    yield:{ food:2 },
-    buildable:true
+    id: 'plains',
+    name: '초원',
+    color: '#3f8d3d',
+    edge: '#66c466',
+    icon: '·',
+    yield: { food: 2 },
+    buildable: true
   },
   f: {
-    id:'forest',
-    name:'숲',
-    color:'#1f6436',
-    edge:'#3fa05a',
-    icon:'♣',
-    yield:{ food:1, production:1 },
-    buildable:true
+    id: 'forest',
+    name: '숲',
+    color: '#1f6436',
+    edge: '#3fa05a',
+    icon: '♣',
+    yield: { food: 1, production: 1 },
+    buildable: true
   },
   d: {
-    id:'desert',
-    name:'사막',
-    color:'#b88932',
-    edge:'#e4c15d',
-    icon:'·',
-    yield:{ gold:2 },
-    buildable:true
+    id: 'desert',
+    name: '사막',
+    color: '#b88932',
+    edge: '#e4c15d',
+    icon: '·',
+    yield: { gold: 2 },
+    buildable: true
   },
   m: {
-    id:'mountain',
-    name:'산악',
-    color:'#666a74',
-    edge:'#b8bdc8',
-    icon:'▲',
-    yield:{ production:2, science:1 },
-    buildable:false
+    id: 'mountain',
+    name: '산악',
+    color: '#666a74',
+    edge: '#b8bdc8',
+    icon: '▲',
+    yield: { production: 2, science: 1 },
+    buildable: false
   },
   j: {
-    id:'jungle',
-    name:'열대우림',
-    color:'#157a3a',
-    edge:'#35b85d',
-    icon:'🌿',
-    yield:{ food:2, culture:1 },
-    buildable:true
+    id: 'jungle',
+    name: '열대우림',
+    color: '#157a3a',
+    edge: '#35b85d',
+    icon: '🌿',
+    yield: { food: 2, culture: 1 },
+    buildable: true
   },
   h: {
-    id:'highland',
-    name:'고원',
-    color:'#555372',
-    edge:'#b0b0d8',
-    icon:'▲',
-    yield:{ science:2 },
-    buildable:true
+    id: 'highland',
+    name: '고원',
+    color: '#555372',
+    edge: '#b0b0d8',
+    icon: '▲',
+    yield: { science: 2 },
+    buildable: true
   }
 };
 
-/* ─── 지도 프로필: 턴 수에 따라 지도 크기 변경 ───── */
+/* ─── 지도 프로필: 턴 수에 따라 지도 규모 변경 ───── */
 var MAP_PROFILES = {
   short: {
-    key:'short',
-    label:'소형 지도',
-    turnLabel:'15턴',
-    cssW:900,
-    cssH:500,
-    hexSize:31,
-    map:[
-      ['o','t','t','t','m','m','h','h','o','o','o'],
-      ['t','t','p','p','m','h','h','p','p','o','o'],
-      ['o','p','p','f','d','d','p','p','f','j','o'],
-      ['o','p','f','d','d','d','p','f','j','j','o'],
-      ['o','f','f','p','d','p','f','j','j','j','o'],
-      ['o','o','j','j','p','p','f','j','j','o','o'],
-      ['o','o','o','j','j','f','p','p','o','o','o']
-    ],
-    starts:{
-      cold:{row:1,col:1},
-      highland:{row:1,col:6},
-      temperate:{row:3,col:1},
-      arid:{row:3,col:4},
-      monsoon:{row:3,col:8},
-      tropical:{row:5,col:3}
-    }
-  },
-
-  standard: {
-    key:'standard',
-    label:'표준 지도',
-    turnLabel:'20턴',
-    cssW:1040,
-    cssH:580,
-    hexSize:29,
-    map:[
+    key: 'short',
+    label: '확장형 소형 지도',
+    turnLabel: '15턴',
+    cssW: 1180,
+    cssH: 660,
+    hexSize: 34,
+    map: [
       ['o','o','t','t','t','m','m','h','h','o','o','o','o'],
       ['o','t','t','p','p','m','h','h','p','p','o','o','o'],
       ['o','t','p','p','f','m','d','d','p','f','f','o','o'],
@@ -161,24 +140,24 @@ var MAP_PROFILES = {
       ['o','o','o','j','j','p','f','f','j','j','o','o','o'],
       ['o','o','o','o','j','j','f','p','p','o','o','o','o']
     ],
-    starts:{
-      cold:{row:1,col:2},
-      highland:{row:1,col:7},
-      temperate:{row:3,col:2},
-      arid:{row:3,col:5},
-      monsoon:{row:3,col:9},
-      tropical:{row:6,col:4}
+    starts: {
+      cold:      { row: 1, col: 2 },
+      highland:  { row: 1, col: 7 },
+      temperate: { row: 3, col: 2 },
+      arid:      { row: 3, col: 5 },
+      monsoon:   { row: 3, col: 9 },
+      tropical:  { row: 6, col: 4 }
     }
   },
 
-  long: {
-    key:'long',
-    label:'대형 지도',
-    turnLabel:'30턴',
-    cssW:1220,
-    cssH:680,
-    hexSize:27,
-    map:[
+  standard: {
+    key: 'standard',
+    label: '대형 표준 지도',
+    turnLabel: '20턴',
+    cssW: 1440,
+    cssH: 820,
+    hexSize: 33,
+    map: [
       ['o','o','t','t','t','t','m','m','h','h','h','o','o','o','o'],
       ['o','t','t','t','p','p','m','h','h','p','p','p','o','o','o'],
       ['o','t','p','p','p','f','m','d','d','p','p','f','f','o','o'],
@@ -190,13 +169,44 @@ var MAP_PROFILES = {
       ['o','o','o','o','o','j','j','f','f','p','p','o','o','o','o'],
       ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
     ],
-    starts:{
-      cold:{row:1,col:2},
-      highland:{row:1,col:8},
-      temperate:{row:3,col:2},
-      arid:{row:3,col:7},
-      monsoon:{row:3,col:12},
-      tropical:{row:7,col:5}
+    starts: {
+      cold:      { row: 1, col: 2 },
+      highland:  { row: 1, col: 8 },
+      temperate: { row: 3, col: 2 },
+      arid:      { row: 3, col: 7 },
+      monsoon:   { row: 3, col: 12 },
+      tropical:  { row: 7, col: 5 }
+    }
+  },
+
+  long: {
+    key: 'long',
+    label: '초대형 장기 지도',
+    turnLabel: '30턴',
+    cssW: 1680,
+    cssH: 940,
+    hexSize: 32,
+    map: [
+      ['o','o','o','t','t','t','t','m','m','h','h','h','h','o','o','o','o'],
+      ['o','o','t','t','t','p','p','m','m','h','h','p','p','p','o','o','o'],
+      ['o','t','t','p','p','p','f','m','d','d','p','p','f','f','o','o','o'],
+      ['o','t','p','p','f','f','d','d','d','d','p','f','f','j','j','o','o'],
+      ['o','p','p','f','f','p','p','d','d','p','p','f','j','j','j','j','o'],
+      ['o','p','f','f','p','p','p','p','p','f','f','j','j','j','j','j','o'],
+      ['o','o','f','p','p','p','p','f','f','f','j','j','j','j','j','o','o'],
+      ['o','o','o','j','j','p','p','p','f','j','j','j','j','j','o','o','o'],
+      ['o','o','o','o','j','j','p','f','f','p','p','j','j','o','o','o','o'],
+      ['o','o','o','o','o','j','j','f','f','p','p','p','o','o','o','o','o'],
+      ['o','o','o','o','o','o','j','j','f','f','p','o','o','o','o','o','o'],
+      ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
+    ],
+    starts: {
+      cold:      { row: 1, col: 3 },
+      highland:  { row: 1, col: 10 },
+      temperate: { row: 4, col: 2 },
+      arid:      { row: 4, col: 8 },
+      monsoon:   { row: 4, col: 14 },
+      tropical:  { row: 8, col: 6 }
     }
   }
 };
@@ -217,10 +227,6 @@ function getMapProfile() {
   return MAP_PROFILES.standard;
 }
 
-function getCurrentMap() {
-  return CURRENT_MAP_PROFILE ? CURRENT_MAP_PROFILE.map : getMapProfile().map;
-}
-
 function getClimateStart(climateId) {
   var profile = CURRENT_MAP_PROFILE || getMapProfile();
   return profile.starts[climateId];
@@ -232,11 +238,11 @@ function hexToRgb(hex) {
     return [255, 255, 255];
   }
 
-  var r = parseInt(hex.slice(1,3),16);
-  var g = parseInt(hex.slice(3,5),16);
-  var b = parseInt(hex.slice(5,7),16);
-
-  return [r,g,b];
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16)
+  ];
 }
 
 function rgbaFromHex(hex, alpha) {
@@ -254,10 +260,6 @@ function tileKey(row, col) {
 
 function getTile(row, col) {
   return MAP_TILE_INDEX[tileKey(row, col)] || null;
-}
-
-function sameTile(a, b) {
-  return a && b && a.row === b.row && a.col === b.col;
 }
 
 function getClimateName(climateId) {
@@ -308,11 +310,11 @@ function formatYield(yieldObj) {
   if (!yieldObj) return '없음';
 
   var labels = {
-    food:'🌾 식량',
-    production:'⚙️ 생산력',
-    gold:'💰 금화',
-    science:'🔬 과학',
-    culture:'🎨 문화'
+    food: '🌾 식량',
+    production: '⚙️ 생산력',
+    gold: '💰 금화',
+    science: '🔬 과학',
+    culture: '🎨 문화'
   };
 
   var result = [];
@@ -347,7 +349,7 @@ function prepareCanvasForHighQuality(canvas) {
   var parentW = parent ? parent.clientWidth : profile.cssW;
 
   var maxCssW = profile.cssW;
-  var cssW = Math.min(maxCssW, Math.max(760, parentW || maxCssW));
+  var cssW = Math.min(maxCssW, Math.max(900, parentW || maxCssW));
   var cssH = Math.round(cssW * (profile.cssH / profile.cssW));
 
   var dpr = window.devicePixelRatio || 1;
@@ -357,6 +359,8 @@ function prepareCanvasForHighQuality(canvas) {
   canvas.style.height = cssH + 'px';
   canvas.style.maxWidth = '100%';
   canvas.style.display = 'block';
+  canvas.style.marginLeft = 'auto';
+  canvas.style.marginRight = 'auto';
 
   var targetW = Math.round(cssW * renderRatio);
   var targetH = Math.round(cssH * renderRatio);
@@ -450,6 +454,14 @@ function markCapitalTiles() {
 }
 
 /* ─── 영토 생성: 수도 주변 반경 기반 ─────────────── */
+function offsetToCube(row, col) {
+  var x = col - (row - (row & 1)) / 2;
+  var z = row;
+  var y = -x - z;
+
+  return { x: x, y: y, z: z };
+}
+
 function getHexDistance(a, b) {
   var ac = offsetToCube(a.row, a.col);
   var bc = offsetToCube(b.row, b.col);
@@ -461,20 +473,12 @@ function getHexDistance(a, b) {
   );
 }
 
-function offsetToCube(row, col) {
-  var x = col - (row - (row & 1)) / 2;
-  var z = row;
-  var y = -x - z;
-
-  return { x:x, y:y, z:z };
-}
-
 function getTerritoryRadiusByTurns() {
   var turns = getMaxTurnsForMap();
 
-  if (turns <= 15) return 1;
-  if (turns >= 30) return 2;
-  return 1;
+  if (turns <= 15) return 2;
+  if (turns >= 30) return 3;
+  return 2;
 }
 
 function getClimateTerritory(climateId) {
@@ -490,18 +494,9 @@ function getClimateTerritory(climateId) {
     var dist = getHexDistance(start, tile);
 
     if (dist <= radius) {
-      result.push({ row:tile.row, col:tile.col });
+      result.push({ row: tile.row, col: tile.col });
     }
   });
-
-  if (result.length < 4) {
-    MAP_TILES.forEach(function(tile) {
-      if (tile.type === 'o') return;
-      if (getHexDistance(start, tile) <= radius + 1) {
-        result.push({ row:tile.row, col:tile.col });
-      }
-    });
-  }
 
   return result;
 }
@@ -544,8 +539,8 @@ function getMapScale(W, H) {
   var hexW = Math.sqrt(3) * hexSize;
   var hexStep = hexSize * 1.5;
 
-  var naturalW = MAP_OFFSET_X + cols * hexW + hexW + 40;
-  var naturalH = MAP_OFFSET_Y + rows * hexStep + hexSize + 80;
+  var naturalW = MAP_OFFSET_X + cols * hexW + hexW + 80;
+  var naturalH = MAP_OFFSET_Y + rows * hexStep + hexSize + 110;
 
   return Math.min(W / naturalW, H / naturalH);
 }
@@ -591,6 +586,15 @@ function pointInHex(px, py, cx, cy, size) {
   return Math.sqrt(3) * dx + dy <= Math.sqrt(3) * size;
 }
 
+function getCanvasCssMetrics(canvas) {
+  var rect = canvas.getBoundingClientRect();
+
+  return {
+    W: rect.width || MAP_W,
+    H: rect.height || MAP_H
+  };
+}
+
 function findTileByPoint(x, y, canvas) {
   ensureMapTiles();
 
@@ -608,15 +612,6 @@ function findTileByPoint(x, y, canvas) {
   }
 
   return null;
-}
-
-function getCanvasCssMetrics(canvas) {
-  var rect = canvas.getBoundingClientRect();
-
-  return {
-    W: rect.width || MAP_W,
-    H: rect.height || MAP_H
-  };
 }
 
 /* ─── 클릭 이벤트 ───────────────────────────────── */
@@ -715,9 +710,7 @@ function showTileInfo(tile, players) {
   var buildableText = tile.buildable ? '가능' : '불가';
 
   box.innerHTML =
-    '<div style="font-weight:700;font-size:15px;margin-bottom:6px;">' +
-      '🧭 선택한 타일' +
-    '</div>' +
+    '<div style="font-weight:700;font-size:15px;margin-bottom:6px;">🧭 선택한 타일</div>' +
     '<div>지도 유형: ' + profile.turnLabel + ' · ' + profile.label + '</div>' +
     '<div>위치: ' + tile.row + '행 ' + tile.col + '열</div>' +
     '<div>지형: ' + tileType.icon + ' ' + tileType.name + '</div>' +
@@ -752,6 +745,7 @@ function drawWorldMap(canvas, players, currentPlayerId) {
   drawBackground(ctx, W, H);
   drawMapTitle(ctx, profile);
   drawAllTiles(ctx, scale, hexSize, players || []);
+  drawTerritoryBorders(ctx, scale, hexSize, players || []);
   drawSelectedTile(ctx, scale, hexSize);
   drawCapitals(ctx, W, H, scale, hexSize, players || [], currentPlayerId);
   drawTileLegend(ctx, 10, H - 78);
@@ -831,14 +825,18 @@ function drawSingleTile(ctx, tile, scale, hexSize, players) {
 
   if (ownerColor) {
     drawHexPath(ctx, pos.x, pos.y, hexSize - HEX_GAP);
-    ctx.fillStyle = rgbaFromHex(ownerColor, 0.25);
+    ctx.fillStyle = rgbaFromHex(ownerColor, 0.38);
+    ctx.fill();
+
+    drawHexPath(ctx, pos.x, pos.y, hexSize - 7 * scale);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.fill();
   }
 
   drawHexPath(ctx, pos.x, pos.y, hexSize - HEX_GAP);
-  ctx.lineWidth = ownerColor ? 1.6 : 1;
+  ctx.lineWidth = ownerColor ? 1.8 : 1;
   ctx.strokeStyle = ownerColor
-    ? rgbaFromHex(ownerColor, 0.75)
+    ? rgbaFromHex(ownerColor, 0.85)
     : 'rgba(255,255,255,0.20)';
   ctx.stroke();
 
@@ -903,6 +901,87 @@ function drawTileBuilding(ctx, tile, pos, scale) {
   ctx.restore();
 }
 
+/* ─── 국가별 영토 경계 강화 ─────────────────────── */
+function drawTerritoryBorders(ctx, scale, hexSize, players) {
+  if (!players || players.length === 0) return;
+
+  players.forEach(function(player) {
+    var color = getPlayerColor(player, player.climate);
+    var ownedTiles = MAP_TILES.filter(function(tile) {
+      return tile.ownerPlayerId === player.id;
+    });
+
+    if (ownedTiles.length === 0) return;
+
+    ctx.save();
+
+    ownedTiles.forEach(function(tile) {
+      var pos = hexToPixel(tile.row, tile.col, scale);
+
+      drawHexPath(ctx, pos.x, pos.y, hexSize - 0.8 * scale);
+      ctx.lineWidth = 4.2 * scale;
+      ctx.strokeStyle = rgbaFromHex(color, 0.95);
+      ctx.stroke();
+
+      drawHexPath(ctx, pos.x, pos.y, hexSize - 4.8 * scale);
+      ctx.lineWidth = 1.35 * scale;
+      ctx.strokeStyle = 'rgba(255,255,255,0.50)';
+      ctx.stroke();
+    });
+
+    drawTerritoryLabel(ctx, scale, player, color);
+
+    ctx.restore();
+  });
+}
+
+function drawTerritoryLabel(ctx, scale, player, color) {
+  var ownedTiles = MAP_TILES.filter(function(tile) {
+    return tile.ownerPlayerId === player.id;
+  });
+
+  if (ownedTiles.length === 0) return;
+
+  var sumX = 0;
+  var sumY = 0;
+
+  ownedTiles.forEach(function(tile) {
+    var pos = hexToPixel(tile.row, tile.col, scale);
+    sumX += pos.x;
+    sumY += pos.y;
+  });
+
+  var cx = sumX / ownedTiles.length;
+  var cy = sumY / ownedTiles.length;
+
+  var label = player.country || player.name || '문명';
+  if (label.length > 7) label = label.slice(0, 7) + '…';
+
+  ctx.save();
+
+  ctx.font = 'bold ' + Math.round(11 * scale) + 'px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  var textW = ctx.measureText(label).width;
+  var boxW = textW + 18 * scale;
+  var boxH = 20 * scale;
+
+  ctx.fillStyle = 'rgba(6,8,20,0.72)';
+  roundRect(ctx, cx - boxW / 2, cy - boxH / 2, boxW, boxH, 8 * scale);
+  ctx.fill();
+
+  ctx.lineWidth = 1.2 * scale;
+  ctx.strokeStyle = rgbaFromHex(color, 0.88);
+  roundRect(ctx, cx - boxW / 2, cy - boxH / 2, boxW, boxH, 8 * scale);
+  ctx.stroke();
+
+  ctx.fillStyle = '#f6e7b5';
+  ctx.fillText(label, cx, cy);
+
+  ctx.restore();
+}
+
 /* ─── 선택 타일 표시 ────────────────────────────── */
 function drawSelectedTile(ctx, scale, hexSize) {
   if (!SELECTED_TILE) return;
@@ -915,12 +994,12 @@ function drawSelectedTile(ctx, scale, hexSize) {
   ctx.save();
 
   drawHexPath(ctx, pos.x, pos.y, hexSize + 2 * scale);
-  ctx.lineWidth = 4 * scale;
+  ctx.lineWidth = 4.4 * scale;
   ctx.strokeStyle = '#f0c040';
   ctx.stroke();
 
   drawHexPath(ctx, pos.x, pos.y, hexSize - 2 * scale);
-  ctx.fillStyle = 'rgba(240,192,64,0.16)';
+  ctx.fillStyle = 'rgba(240,192,64,0.18)';
   ctx.fill();
 
   ctx.restore();
@@ -978,7 +1057,7 @@ function drawPlayerCapital(ctx, W, H, scale, hexSize, climateId, start, player, 
   }
 
   drawHexPath(ctx, pos.x, pos.y, hexSize - 2 * scale);
-  ctx.fillStyle = rgbaFromHex(color, isHighlight ? 0.46 : 0.34);
+  ctx.fillStyle = rgbaFromHex(color, isHighlight ? 0.52 : 0.42);
   ctx.fill();
 
   ctx.lineWidth = isHighlight ? 3 : 2;
@@ -1064,11 +1143,11 @@ function drawMiniResBar(ctx, x, y, w, player, scale) {
   var res = player.resources || {};
 
   var items = [
-    { key:'food',       color:'#60d060', val: Math.floor(res.food || 0) },
-    { key:'gold',       color:'#f0c040', val: Math.floor(res.gold || 0) },
-    { key:'production', color:'#80aac8', val: Math.floor(res.production || 0) },
-    { key:'science',    color:'#50a8e8', val: Math.floor(res.science || 0) },
-    { key:'culture',    color:'#b050e8', val: Math.floor(res.culture || 0) }
+    { key: 'food',       color: '#60d060', val: Math.floor(res.food || 0) },
+    { key: 'gold',       color: '#f0c040', val: Math.floor(res.gold || 0) },
+    { key: 'production', color: '#80aac8', val: Math.floor(res.production || 0) },
+    { key: 'science',    color: '#50a8e8', val: Math.floor(res.science || 0) },
+    { key: 'culture',    color: '#b050e8', val: Math.floor(res.culture || 0) }
   ];
 
   var maxVal = Math.max.apply(null, items.map(function(i) {
@@ -1116,24 +1195,24 @@ function getBuildingEmojiById(id) {
   }
 
   var fallback = {
-    farm:'🌾',
-    aqueduct:'💧',
-    workshop:'🔧',
-    foundry:'🏭',
-    market:'🏪',
-    harbor:'⚓',
-    library:'📚',
-    university:'🎓',
-    temple:'🏛️',
-    theater:'🎭',
-    barracks:'⚔️',
-    fortress:'🏰',
-    rice_terrace:'🌾',
-    caravanserai:'🏕️',
-    windmill:'⚙️',
-    fur_post:'🦊',
-    rice_paddy:'🌿',
-    observatory:'🔭'
+    farm: '🌾',
+    aqueduct: '💧',
+    workshop: '🔧',
+    foundry: '🏭',
+    market: '🏪',
+    harbor: '⚓',
+    library: '📚',
+    university: '🎓',
+    temple: '🏛️',
+    theater: '🎭',
+    barracks: '⚔️',
+    fortress: '🏰',
+    rice_terrace: '🌾',
+    caravanserai: '🏕️',
+    windmill: '⚙️',
+    fur_post: '🦊',
+    rice_paddy: '🌿',
+    observatory: '🔭'
   };
 
   return fallback[id] || '🏗️';
@@ -1152,19 +1231,19 @@ function drawMapTitle(ctx, profile) {
 
   ctx.font = '10px sans-serif';
   ctx.fillStyle = 'rgba(210,225,245,0.66)';
-  ctx.fillText(profile.turnLabel + ' · ' + profile.label + ' · PC 고화질 렌더링', 12, 30);
+  ctx.fillText(profile.turnLabel + ' · ' + profile.label + ' · 국가별 영토 강화', 12, 30);
 
   ctx.restore();
 }
 
 function drawTileLegend(ctx, x, y) {
   var items = [
-    { code:'p', label:'초원' },
-    { code:'f', label:'숲' },
-    { code:'d', label:'사막' },
-    { code:'m', label:'산' },
-    { code:'t', label:'설원' },
-    { code:'j', label:'열대' }
+    { code: 'p', label: '초원' },
+    { code: 'f', label: '숲' },
+    { code: 'd', label: '사막' },
+    { code: 'm', label: '산' },
+    { code: 't', label: '설원' },
+    { code: 'j', label: '열대' }
   ];
 
   ctx.save();
