@@ -202,29 +202,55 @@ function processTurn() {
     }
 
     /* 건설 (일반 건물 + 기후 고유 건물 모두 처리) */
-    if (act.build) {
-      var allBuildings = BUILDINGS.concat(typeof UNIQUE_BUILDINGS !== 'undefined' ? UNIQUE_BUILDINGS : []);
-      var bDef = allBuildings.find(function(x){ return x.id===act.build; });
-      if (bDef) {
-        /* 고유 건물 기후 제한 */
-        var climateOk = !bDef.climate || bDef.climate === p.climate;
-        /* 최대 개수 확인 */
-        var bcount = p.buildings.filter(function(b){ return b===act.build; }).length;
-        var maxOk  = bcount < (bDef.max || 1);
-        /* 비용 확인 */
-        var okB = climateOk && maxOk;
-        Object.keys(bDef.cost||{}).forEach(function(r){ if((p.resources[r]||0)<bDef.cost[r]) okB=false; });
-        if (okB) {
-          Object.keys(bDef.cost||{}).forEach(function(r){ p.resources[r]-=bDef.cost[r]; });
-          p.buildings.push(act.build);
-          if (bDef.spec==='mil5')  p.military   += 5;
-          if (bDef.spec==='mil12') p.military   += 12;
-          if (bDef.spec==='mil3')  p.military   += 3;
-          if (bDef.spec==='pop1')  p.population += 1;
-          if (bDef.spec==='dip5')  p.dipBonus   = (p.dipBonus||0) + 5;
-        }
-      }
+if (act.build) {
+  var allBuildings = BUILDINGS.concat(typeof UNIQUE_BUILDINGS !== 'undefined' ? UNIQUE_BUILDINGS : []);
+  var bDef = allBuildings.find(function(x) {
+    return x.id === act.build;
+  });
+
+  if (bDef) {
+    var climateOk = !bDef.climate || bDef.climate === p.climate;
+
+    var bcount = p.buildings.filter(function(b) {
+      return b === act.build;
+    }).length;
+
+    var maxOk = bcount < (bDef.max || 1);
+
+    var reqOk = !bDef.req || p.buildings.indexOf(bDef.req) !== -1;
+
+    var costOk = true;
+    Object.keys(bDef.cost || {}).forEach(function(r) {
+      if ((p.resources[r] || 0) < bDef.cost[r]) costOk = false;
+    });
+
+    var tileOk = true;
+
+    if (typeof canPlaceBuildingOnTile === 'function') {
+      tileOk = canPlaceBuildingOnTile(p, act.build, act.buildTile);
     }
+
+    var okB = climateOk && maxOk && reqOk && costOk && tileOk;
+
+    if (okB) {
+      Object.keys(bDef.cost || {}).forEach(function(r) {
+        p.resources[r] -= bDef.cost[r];
+      });
+
+      p.buildings.push(act.build);
+
+      if (typeof placeBuildingOnSelectedTile === 'function') {
+        placeBuildingOnSelectedTile(p, act.build, act.buildTile);
+      }
+
+      if (bDef.spec === 'mil5')  p.military += 5;
+      if (bDef.spec === 'mil12') p.military += 12;
+      if (bDef.spec === 'mil3')  p.military += 3;
+      if (bDef.spec === 'pop1')  p.population += 1;
+      if (bDef.spec === 'dip5')  p.dipBonus = (p.dipBonus || 0) + 5;
+    }
+  }
+}
 
     /* 연구 (전문 분야 25% 할인 적용) */
     if (act.research) {
