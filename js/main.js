@@ -66,8 +66,23 @@ function startGame() {
 
 /* ─── 턴 제출 ────────────────────────────────────── */
 function submitTurn() {
-  var p  = G.players[G.curPlayer];
-  p.action = { build:G.selBuild, research:G.selTech, policy:G.selPolicy, diplo:null };
+  var p = G.players[G.curPlayer];
+
+  if (G.selBuild && !G.selBuildTile) {
+    alert('건물을 지을 타일을 먼저 선택하세요.');
+    return;
+  }
+
+  p.action = {
+    build: G.selBuild,
+    buildTile: G.selBuildTile || null,
+    research: G.selTech,
+    policy: G.selPolicy,
+    diplo: null
+  };
+
+  G.selBuildTile = null;
+
   advanceHuman();
 }
 
