@@ -9,11 +9,8 @@
    3. <div id="worldMapButtonHost"> 버튼식 지도 전용 host 생성
    4. 실제 button 요소로 육각형 타일 생성
    5. 타일 하나하나가 클릭 가능한 개체
-   6. MAP_TILES 데이터와 버튼이 직접 연결됨
-   7. G.maxTurns 값에 따라 지도 규모 변경
-   8. 인구가 늘어날수록 영토가 점차 확장됨
-   9. 영토는 타일색으로 칠하지 않고 선으로만 구분
-   10. 기존 scheduleMapDraw(players, currentPlayerId) 함수명 유지
+   6. 인구가 늘어날수록 영토가 점차 확장됨
+   7. 영토는 타일색으로 칠하지 않고 진한 선으로만 구분
 ========================================================= */
 
 /* ─── 전역 상태 ─────────────────────────────────── */
@@ -269,7 +266,7 @@ function ensureButtonMapStyles() {
       'background:var(--tile-color);' +
       'box-shadow:inset 0 0 0 2px rgba(255,255,255,.16),inset 0 -16px 22px rgba(0,0,0,.22),inset 0 10px 16px rgba(255,255,255,.12);' +
       'transition:transform .08s ease, filter .08s ease, box-shadow .08s ease;' +
-      'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:none;' +
+      'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:none;overflow:hidden;' +
     '}' +
 
     '.hex-tile-btn:hover{transform:translateY(-2px) scale(1.035);filter:brightness(1.12);z-index:40!important;}' +
@@ -277,31 +274,51 @@ function ensureButtonMapStyles() {
 
     '.hex-tile-btn.owned{' +
       'background:var(--tile-color);' +
-      'box-shadow:0 0 0 4px var(--owner-strong),0 0 0 7px rgba(255,255,255,.28),0 0 16px var(--owner-soft),inset 0 0 0 2px rgba(255,255,255,.18),inset 0 -16px 22px rgba(0,0,0,.22);' +
+      'box-shadow:inset 0 0 0 2px rgba(255,255,255,.16),inset 0 -16px 22px rgba(0,0,0,.22),inset 0 10px 16px rgba(255,255,255,.12);' +
       'z-index:10;' +
     '}' +
 
+    '.hex-territory-line{' +
+      'position:absolute;inset:3px;' +
+      'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
+      'background:var(--owner-strong);' +
+      'pointer-events:none;z-index:1;' +
+    '}' +
+
+    '.hex-territory-line::after{' +
+      'content:"";position:absolute;inset:7px;' +
+      'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
+      'background:var(--tile-color);' +
+    '}' +
+
+    '.hex-territory-glow{' +
+      'position:absolute;inset:0;' +
+      'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
+      'box-shadow:inset 0 0 0 5px var(--owner-strong),inset 0 0 20px var(--owner-soft);' +
+      'pointer-events:none;z-index:2;' +
+    '}' +
+
     '.hex-tile-btn.capital{' +
-      'box-shadow:0 0 0 5px var(--owner-strong),0 0 0 9px rgba(240,192,64,.72),0 0 22px var(--owner-strong),inset 0 0 0 2px rgba(255,255,255,.24),inset 0 -16px 22px rgba(0,0,0,.24);' +
+      'box-shadow:inset 0 0 0 6px var(--owner-strong),inset 0 0 0 11px rgba(240,192,64,.75),inset 0 0 24px var(--owner-soft),inset 0 -16px 22px rgba(0,0,0,.24);' +
       'z-index:22;' +
     '}' +
 
     '.hex-tile-btn.current-capital{animation:hexPulse 1.4s ease-in-out infinite;}' +
 
     '.hex-tile-btn.selected{' +
-      'box-shadow:0 0 0 5px #f0c040,0 0 0 9px rgba(255,255,255,.62),0 0 24px rgba(240,192,64,.80),inset 0 0 0 2px rgba(255,255,255,.30),inset 0 -16px 22px rgba(0,0,0,.24);' +
+      'box-shadow:inset 0 0 0 6px #f0c040,inset 0 0 0 11px rgba(255,255,255,.62),inset 0 0 24px rgba(240,192,64,.80),inset 0 -16px 22px rgba(0,0,0,.24);' +
       'z-index:60!important;filter:brightness(1.16);' +
     '}' +
 
     '@keyframes hexPulse{0%,100%{filter:brightness(1);}50%{filter:brightness(1.28);}}' +
 
-    '.hex-icon{position:absolute;left:0;right:0;top:21px;text-align:center;font-size:18px;line-height:1;color:rgba(255,255,255,.88);text-shadow:0 1px 3px rgba(0,0,0,.55);pointer-events:none;}' +
-    '.hex-yield{position:absolute;right:15px;bottom:17px;font-size:12px;line-height:1;opacity:.82;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));pointer-events:none;}' +
+    '.hex-icon{position:absolute;left:0;right:0;top:21px;text-align:center;font-size:18px;line-height:1;color:rgba(255,255,255,.92);text-shadow:0 1px 3px rgba(0,0,0,.65);pointer-events:none;z-index:3;}' +
+    '.hex-yield{position:absolute;right:15px;bottom:17px;font-size:12px;line-height:1;opacity:.86;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));pointer-events:none;z-index:3;}' +
 
     '.hex-owner-mark{' +
       'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;' +
       'background:rgba(6,8,20,.88);display:flex;align-items:center;justify-content:center;font-size:14px;' +
-      'border:2px solid var(--owner-strong);box-shadow:0 0 12px var(--owner-soft);pointer-events:none;' +
+      'border:2px solid var(--owner-strong);box-shadow:0 0 12px var(--owner-soft);pointer-events:none;z-index:4;' +
     '}' +
 
     '.hex-country-label{' +
@@ -543,12 +560,12 @@ function renderButtonHexMap(players, currentPlayerId) {
   html += '<div class="hex-map-header">';
   html += '<div>';
   html += '<div class="hex-map-title">🗺️ 문명 지도</div>';
-  html += '<div class="hex-map-subtitle">' + profile.turnLabel + ' · ' + profile.label + ' · 인구 성장형 영토</div>';
+  html += '<div class="hex-map-subtitle">' + profile.turnLabel + ' · ' + profile.label + ' · 진한 선 영토 표시</div>';
   html += '</div>';
   html += '<div class="hex-map-badges">';
   html += '<div class="hex-map-badge">타일 ' + MAP_TILES.length + '개</div>';
   html += '<div class="hex-map-badge">영토 ' + ownedCount + '칸</div>';
-  html += '<div class="hex-map-badge">영토는 선으로 표시</div>';
+  html += '<div class="hex-map-badge">인구 성장형 영토</div>';
   html += '</div>';
   html += '</div>';
 
@@ -626,6 +643,11 @@ function renderTileButton(tile, players, currentPlayerId) {
   html += ' data-col="' + tile.col + '"';
   html += ' title="' + safeText(title) + '"';
   html += ' aria-label="' + safeText(title) + '">';
+
+  if (owner) {
+    html += '<span class="hex-territory-line"></span>';
+    html += '<span class="hex-territory-glow"></span>';
+  }
 
   html += '<span class="hex-icon">' + tileType.icon + '</span>';
   html += '<span class="hex-yield">' + getYieldIcon(tile) + '</span>';
@@ -755,49 +777,8 @@ function showTileInfo(tile, players) {
     '<div>건설 가능: ' + buildableText + '</div>' +
     '<div>건물: ' + safeText(tile.buildingId || '없음') + '</div>' +
     '<div style="margin-top:8px;color:rgba(246,231,181,.68);font-size:12px;">' +
-      '※ 영토는 인구에 따라 확장되며, 타일색은 유지하고 국가별 선으로만 구분됩니다.' +
+      '※ 영토는 인구에 따라 확장되며, 진한 국가색 선으로 표시됩니다.' +
     '</div>';
-}
-
-/* ─── 건물 아이콘 헬퍼: 이후 확장용 ─────────────── */
-function getBuildingCatalog() {
-  var list = [];
-
-  if (typeof BUILDINGS !== 'undefined' && BUILDINGS) list = list.concat(BUILDINGS);
-  if (typeof UNIQUE_BUILDINGS !== 'undefined' && UNIQUE_BUILDINGS) list = list.concat(UNIQUE_BUILDINGS);
-
-  return list;
-}
-
-function getBuildingEmojiById(id) {
-  var catalog = getBuildingCatalog();
-
-  for (var i = 0; i < catalog.length; i++) {
-    if (catalog[i].id === id) return catalog[i].emoji || '🏗️';
-  }
-
-  var fallback = {
-    farm:'🌾',
-    aqueduct:'💧',
-    workshop:'🔧',
-    foundry:'🏭',
-    market:'🏪',
-    harbor:'⚓',
-    library:'📚',
-    university:'🎓',
-    temple:'🏛️',
-    theater:'🎭',
-    barracks:'⚔️',
-    fortress:'🏰',
-    rice_terrace:'🌾',
-    caravanserai:'🏕️',
-    windmill:'⚙️',
-    fur_post:'🦊',
-    rice_paddy:'🌿',
-    observatory:'🔭'
-  };
-
-  return fallback[id] || '🏗️';
 }
 
 /* ─── 리사이즈 시 다시 그림 ─────────────────────── */
