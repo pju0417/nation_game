@@ -626,26 +626,33 @@ function renderTileButton(tile, players, currentPlayerId) {
   var owner = getPlayerById(players, tile.ownerPlayerId);
   var ownerColor = owner ? getPlayerColor(owner, owner.climate) : null;
 
+  /*
+    실제 참여 중인 국가의 수도인지 확인.
+    핵심:
+    - tile.isCapital만 보면, 게임에 참여하지 않는 기후의 수도도 표시됨
+    - 반드시 owner가 있고, 그 owner의 climate와 capitalClimate가 같아야 수도로 표시
+  */
+  var isOwnedCapital = !!(
+    owner &&
+    tile.isCapital &&
+    tile.capitalClimate &&
+    owner.climate === tile.capitalClimate
+  );
+
   var left = 30 + tile.col * HEX_X_GAP + (tile.row % 2) * (HEX_X_GAP / 2);
   var top = 24 + tile.row * HEX_Y_GAP;
 
   var classes = ['hex-tile-btn'];
 
-  /*
-    중요:
-    owner가 있는 타일만 영토/수도 효과를 줍니다.
-    참여하지 않는 기후의 수도는 tile.isCapital === true여도
-    capital 클래스를 붙이지 않습니다.
-  */
   if (owner) {
     classes.push('owned');
   }
 
-  if (owner && tile.isCapital) {
+  if (isOwnedCapital) {
     classes.push('capital');
   }
 
-  if (owner && owner.id === currentPlayerId && tile.isCapital) {
+  if (isOwnedCapital && owner.id === currentPlayerId) {
     classes.push('current-capital');
   }
 
@@ -668,6 +675,7 @@ function renderTileButton(tile, players, currentPlayerId) {
   }
 
   var title = tileType.name + ' / ' + tile.row + '행 ' + tile.col + '열';
+
   if (owner) {
     title += ' / ' + owner.name + '의 영토';
   }
@@ -683,7 +691,8 @@ function renderTileButton(tile, players, currentPlayerId) {
   html += ' aria-label="' + safeText(title) + '">';
 
   /*
-    영토선은 실제 소유자가 있는 타일에만 표시합니다.
+    영토선은 소유자가 있는 타일에만 표시.
+    단, 타일 색은 유지하고 선만 표시.
   */
   if (owner) {
     html += '<span class="hex-territory-line"></span>';
@@ -694,9 +703,10 @@ function renderTileButton(tile, players, currentPlayerId) {
   html += '<span class="hex-yield">' + getYieldIcon(tile) + '</span>';
 
   /*
-    수도 아이콘도 실제 참여 중인 국가의 수도에만 표시합니다.
+    수도 아이콘은 실제 참여 중인 국가의 자기 수도에만 표시.
+    참여하지 않는 기후의 수도는 표시하지 않음.
   */
-  if (owner && tile.isCapital) {
+  if (isOwnedCapital) {
     html += '<span class="hex-owner-mark">' + safeText(owner.emoji || '👑') + '</span>';
   }
 
@@ -808,11 +818,18 @@ function showTileInfo(tile, players) {
   var owner = getPlayerById(players, tile.ownerPlayerId);
   var profile = CURRENT_MAP_PROFILE || getMapProfile();
 
+  var isOwnedCapital = !!(
+    owner &&
+    tile.isCapital &&
+    tile.capitalClimate &&
+    owner.climate === tile.capitalClimate
+  );
+
   var ownerText = owner
     ? safeText((owner.emoji || '👑') + ' ' + owner.name + ' / ' + owner.country)
     : '없음';
 
-  var capitalText = tile.isCapital
+  var capitalText = isOwnedCapital
     ? safeText(getClimateEmoji(tile.capitalClimate) + ' ' + getClimateName(tile.capitalClimate) + ' 수도')
     : '아님';
 
@@ -836,7 +853,6 @@ function showTileInfo(tile, players) {
       '※ 영토는 인구에 따라 확장되며, 진한 국가색 선으로 표시됩니다.' +
     '</div>';
 }
-
 /* ─── 리사이즈 시 다시 그림 ─────────────────────── */
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', function() {
