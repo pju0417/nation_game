@@ -183,15 +183,106 @@ function sendTrade() {
 function sendDiplo(type) {
   var targetEl = document.getElementById('diploTarget');
   if (!targetEl) return;
+
   var toId = parseInt(targetEl.value);
-  var p    = G.players[G.curPlayer];
+  var from = G.players[G.curPlayer];
+  var to = G.players.find(function(p) {
+    return p.id === toId;
+  });
 
-  if ((p.resources.gold||0) < 5) { alert('금화가 부족합니다. (5 필요)'); return; }
+  if (!from || !to) return;
 
-  makeDiplo(p.id, toId, type);
-  var typeLabel = type==='alliance'?'동맹':'군사 협력';
-  alert(typeLabel+' 제안을 보냈습니다!');
+  if (from.id === to.id) {
+    alert('자기 자신에게는 외교 요청을 보낼 수 없습니다.');
+    return;
+  }
+
+  if ((from.resources.gold || 0) < 5) {
+    alert('금화가 부족합니다. 외교 요청에는 금화 5가 필요합니다.');
+    return;
+  }
+
+  if ((to.resources.gold || 0) < 5) {
+    alert(to.name + '의 금화가 부족해서 외교 요청을 진행할 수 없습니다.');
+    return;
+  }
+
+  var typeLabel = type === 'alliance' ? '동맹' : '군사 협력';
+
+  var accepted = false;
+
+  if (to.isAI) {
+    accepted = aiDiploAccepts(from, to, type);
+    alert(to.name + '의 응답: ' + (accepted ? '수락' : '거절'));
+  } else {
+    accepted = confirm(
+      from.name + ' → ' + to.name + '\n\n' +
+      typeLabel + ' 요청을 수락하시겠습니까?\n\n' +
+      '수락하면 양쪽 모두 금화 5를 사용합니다.'
+    );
+  }
+
+  if (!accepted) {
+    alert(typeLabel + ' 요청이 거절되었습니다. 조건을 바꾸어 다시 요청할 수 있습니다.');
+    return;
+  }
+
+  applyDiploNow(from, to, type);
+  alert(typeLabel + '이(가) 체결되었습니다!');
   render();
+}
+
+function aiDiploAccepts(from, to, type) {
+  var fromScore = from.scores ? from.scores.total : 0;
+  var toScore = to.scores ? to.scores.total : 0;
+
+  var chance = 0.55;
+
+  if (fromScore < toScore) chance += 0.15;
+  if (type === 'mil_pact' && from.military > to.military) chance += 0.10;
+  if (type === 'alliance' && (from.dipBonus || 0) > 10) chance += 0.10;
+
+  chance = Math.max(0.25, Math.min(0.85, chance));
+
+  return Math.random() < chance;
+}
+
+function applyDiploNow(from, to, type) {
+  from.resources.gold -= 5;
+  to.resources.gold -= 5;
+
+  if (type === 'alliance') {
+    from.allies = from.allies || [];
+    to.allies = to.allies || [];
+
+    var fa = from.allies.find(function(a) {
+      return a.partnerId === to.id;
+    });
+
+    var ta = to.allies.find(function(a) {
+      return a.partnerId === from.id;
+    });
+
+    if (fa) fa.turnsLeft = 3;
+    else from.allies.push({ partnerId: to.id, turnsLeft: 3 });
+
+    if (ta) ta.turnsLeft = 3;
+    else to.allies.push({ partnerId: from.id, turnsLeft: 3 });
+
+    from.dipBonus = (from.dipBonus || 0) + 10;
+    to.dipBonus = (to.dipBonus || 0) + 10;
+  }
+
+  if (type === 'mil_pact') {
+    from.military += 5;
+    to.military += 5;
+
+    from.dipBonus = (from.dipBonus || 0) + 5;
+    to.dipBonus = (to.dipBonus || 0) + 5;
+  }
+
+  calcScore(from);
+  calcScore(to);
 }
 
 /* ─── 렌더 라우터 ────────────────────────────────── */
