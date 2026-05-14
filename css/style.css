@@ -564,3 +564,119 @@ input[disabled] {
     padding: 9px 12px;
   }
 }
+
+/* ─── 지도 중심 플레이 화면 레이아웃 ───────────────── */
+
+.map-play-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(620px, 1fr) 360px;
+  gap: 14px;
+  width: 100%;
+  max-width: 1740px;
+  margin: 0 auto;
+  padding: 14px 18px 22px;
+  align-items: start;
+}
+
+.map-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.map-center-col {
+  min-width: 0;
+}
+
+.map-action-col .scrollable {
+  max-height: 420px;
+}
+
+.decision-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.decision-box {
+  text-align: center;
+  padding: 9px;
+  background: rgba(0,0,0,0.22);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.decision-label {
+  color: var(--text2);
+  font-size: 0.76em;
+  margin-bottom: 3px;
+}
+
+.decision-value {
+  font-weight: 800;
+  font-size: 0.86em;
+}
+
+/* 기존 game-grid가 남아 있는 다른 화면과 충돌하지 않도록 유지 */
+.game-screen-map-layout .game-grid {
+  max-width: none;
+}
+
+/* 지도 중심 화면에서는 패널을 살짝 조밀하게 */
+.game-screen-map-layout .panel {
+  padding: 14px;
+}
+
+.game-screen-map-layout .section-title {
+  margin-bottom: 8px;
+}
+
+/* 가운데 지도는 화면에서 더 넓게 보이도록 */
+.game-screen-map-layout .hex-map-shell {
+  max-width: 100%;
+}
+
+/* 오른쪽 선택창 탭은 좁은 폭에서도 줄바꿈 없이 스크롤 */
+.game-screen-map-layout .tabs {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* 반응형 */
+@media (max-width: 1380px) {
+  .map-play-grid {
+    grid-template-columns: 250px minmax(560px, 1fr) 330px;
+    gap: 12px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .map-play-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map-center-col {
+    order: 1;
+  }
+
+  .map-info-col {
+    order: 2;
+  }
+
+  .map-action-col {
+    order: 3;
+  }
+}
+
+@media (max-width: 640px) {
+  .map-play-grid {
+    padding: 10px;
+  }
+
+  .map-action-col .scrollable {
+    max-height: 360px;
+  }
+}
