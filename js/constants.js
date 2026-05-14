@@ -6,14 +6,16 @@
 /* ─── 기후 ───────────────────────────────────────── */
 var CLIMATES = {
   tropical: {
-    id:'tropical', name:'열대', emoji:'🌴', color:'#50d878',
-    bg:'linear-gradient(135deg,#0d2e14,#060f08)',
-    desc:'풍부한 강수량으로 식량이 넘치는 열대우림 기후.',
-    geo:'동남아시아 · 아프리카 중부 · 아마존',
-    base:{ food:4, production:1, gold:2, science:1, culture:2 },
-    perk:'🌾 식량 탁월', weakness:'🔬 과학 느림', specialty:'agriculture',
-    mapX:580, mapY:330   /* 지도 위치 */
-  },
+  id:'tropical', name:'열대', emoji:'🌴', color:'#50d878',
+  bg:'linear-gradient(135deg,#0d2e14,#060f08)',
+  desc:'풍부한 강수량과 생물 다양성으로 식량과 인구 성장이 빠른 열대우림 기후.',
+  geo:'동남아시아 · 아프리카 중부 · 아마존',
+  base:{ food:4, production:2, gold:2, science:1, culture:2 },
+  perk:'🌾 식량 탁월 · 인구 성장 유리',
+  weakness:'🔬 과학 발전은 다소 느림',
+  specialty:'agriculture',
+  mapX:580, mapY:330
+},
   arid: {
     id:'arid', name:'건조', emoji:'🏜️', color:'#d4a845',
     bg:'linear-gradient(135deg,#2e1e08,#100a02)',
@@ -150,11 +152,11 @@ var BUILDINGS = [
 */
 var UNIQUE_BUILDINGS = [
   {
-    id:'rice_terrace', name:'다랑논', emoji:'🌾', climate:'tropical',
-    cost:{ production:7 }, perTurn:{ food:3, culture:1 },
-    desc:'식량 +3, 문화 +1/턴', max:1,
-    lore:'열대의 풍부한 비로 가득 찬 계단식 논밭'
-  },
+  id:'rice_terrace', name:'다랑논', emoji:'🌾', climate:'tropical',
+  cost:{ production:6 }, perTurn:{ food:4, culture:1 },
+  spec:'pop1', desc:'식량 +4, 문화 +1/턴, 인구 +1', max:1,
+  lore:'열대의 풍부한 비로 가득 찬 계단식 논밭'
+},
   {
     id:'caravanserai', name:'대상 숙소', emoji:'🏕️', climate:'arid',
     cost:{ production:7, gold:3 }, perTurn:{ gold:4 },
