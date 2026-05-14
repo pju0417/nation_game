@@ -270,6 +270,23 @@ function ensureButtonMapStyles() {
     '}' +
 
     '.hex-tile-btn:hover{transform:translateY(-2px) scale(1.035);filter:brightness(1.12);z-index:40!important;}' +
+    '.hex-tile-btn:focus{' +
+  'outline:none!important;' +
+  'box-shadow:inherit;' +
+'}' +
+
+'.hex-tile-btn:focus-visible{' +
+  'outline:none!important;' +
+  'box-shadow:inherit;' +
+'}' +
+
+'.hex-tile-btn:active{' +
+  'outline:none!important;' +
+'}' +
+
+'.hex-tile-btn::-moz-focus-inner{' +
+  'border:0;' +
+'}' +
     '.hex-tile-btn:focus,.hex-tile-btn:focus-visible{' +
     'outline:none;' +
     '}' +
