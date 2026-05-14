@@ -614,10 +614,27 @@ function renderTileButton(tile, players, currentPlayerId) {
 
   var classes = ['hex-tile-btn'];
 
-  if (owner) classes.push('owned');
-  if (tile.isCapital) classes.push('capital');
-  if (owner && owner.id === currentPlayerId && tile.isCapital) classes.push('current-capital');
-  if (SELECTED_TILE && SELECTED_TILE.row === tile.row && SELECTED_TILE.col === tile.col) classes.push('selected');
+  /*
+    중요:
+    owner가 있는 타일만 영토/수도 효과를 줍니다.
+    참여하지 않는 기후의 수도는 tile.isCapital === true여도
+    capital 클래스를 붙이지 않습니다.
+  */
+  if (owner) {
+    classes.push('owned');
+  }
+
+  if (owner && tile.isCapital) {
+    classes.push('capital');
+  }
+
+  if (owner && owner.id === currentPlayerId && tile.isCapital) {
+    classes.push('current-capital');
+  }
+
+  if (SELECTED_TILE && SELECTED_TILE.row === tile.row && SELECTED_TILE.col === tile.col) {
+    classes.push('selected');
+  }
 
   var style = '';
   style += 'left:' + left + 'px;';
@@ -634,7 +651,9 @@ function renderTileButton(tile, players, currentPlayerId) {
   }
 
   var title = tileType.name + ' / ' + tile.row + '행 ' + tile.col + '열';
-  if (owner) title += ' / ' + owner.name + '의 영토';
+  if (owner) {
+    title += ' / ' + owner.name + '의 영토';
+  }
 
   var html = '';
 
@@ -646,6 +665,9 @@ function renderTileButton(tile, players, currentPlayerId) {
   html += ' title="' + safeText(title) + '"';
   html += ' aria-label="' + safeText(title) + '">';
 
+  /*
+    영토선은 실제 소유자가 있는 타일에만 표시합니다.
+  */
   if (owner) {
     html += '<span class="hex-territory-line"></span>';
     html += '<span class="hex-territory-glow"></span>';
@@ -654,6 +676,9 @@ function renderTileButton(tile, players, currentPlayerId) {
   html += '<span class="hex-icon">' + tileType.icon + '</span>';
   html += '<span class="hex-yield">' + getYieldIcon(tile) + '</span>';
 
+  /*
+    수도 아이콘도 실제 참여 중인 국가의 수도에만 표시합니다.
+  */
   if (owner && tile.isCapital) {
     html += '<span class="hex-owner-mark">' + safeText(owner.emoji || '👑') + '</span>';
   }
@@ -726,6 +751,18 @@ function bindButtonMapEvents(host) {
     var tile = getTile(row, col);
 
     if (!tile) return;
+
+    /*
+      클릭 후 브라우저 기본 포커스 표시 제거.
+      이상한 사각형 선이나 잔상처럼 보이는 선을 방지합니다.
+    */
+    if (typeof btn.blur === 'function') {
+      btn.blur();
+    }
+
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
 
     selectTile(tile);
   });
