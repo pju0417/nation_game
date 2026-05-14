@@ -1,51 +1,44 @@
 /* =========================================================
    나라 경영 시뮬레이션 · map.js
-   선택 가능한 문명식 육각형 타일 지도 버전
+   PC 고화질 + 턴 수에 따라 크기가 변하는 선택형 육각 타일 지도
    made by 박선생
 
    핵심 기능:
-   1. 육각형 하나하나를 MAP_TILES 데이터 객체로 생성
-   2. Canvas 클릭 좌표를 실제 타일 데이터와 연결
-   3. 선택한 타일 노란색 강조
-   4. 선택한 타일의 지형, 소유자, 생산량, 건물 정보 표시
-   5. 기존 index.html 수정 없이 scheduleMapDraw() 유지
+   1. PC 환경 고해상도 Canvas 렌더링
+   2. G.maxTurns 값에 따라 지도 크기 변경
+      - 15턴: 소형 지도
+      - 20턴: 표준 지도
+      - 30턴: 대형 지도
+   3. 육각형 하나하나를 MAP_TILES 데이터 객체로 생성
+   4. Canvas 클릭 좌표를 실제 타일 데이터와 연결
+   5. 선택한 타일 강조 + 정보창 표시
+   6. 기존 index.html 수정 없이 scheduleMapDraw() 유지
 ========================================================= */
 
-/* ─── 기본 지도 상수 ─────────────────────────────── */
+/* ─── 기본 상수 ─────────────────────────────────── */
 var MAP_W = 760;
 var MAP_H = 420;
 
-var HEX_SIZE = 25;
-var HEX_GAP = 1.5;
-var HEX_W = Math.sqrt(3) * HEX_SIZE;
-var HEX_H_STEP = HEX_SIZE * 1.5;
+var BASE_HEX_SIZE = 27;
+var HEX_GAP = 1.4;
 
-var MAP_OFFSET_X = 72;
-var MAP_OFFSET_Y = 48;
+var MAP_OFFSET_X = 70;
+var MAP_OFFSET_Y = 54;
 
 var CLIMATE_ORDER = ['cold', 'highland', 'temperate', 'arid', 'monsoon', 'tropical'];
 
-/*
-  문명식 육각형 지도
-  o = 바다
-  t = 설원
-  p = 초원
-  f = 숲
-  d = 사막
-  m = 산악
-  j = 열대우림
-  h = 고원
-*/
-var CIV_MAP = [
-  ['o','o','t','t','t','m','m','h','h','o','o','o','o'],
-  ['o','t','t','p','p','m','h','h','p','p','o','o','o'],
-  ['o','t','p','p','f','m','d','d','p','f','f','o','o'],
-  ['o','p','p','f','d','d','d','p','p','f','j','j','o'],
-  ['o','p','f','f','p','d','d','p','f','j','j','j','o'],
-  ['o','o','f','p','p','p','p','f','j','j','j','o','o'],
-  ['o','o','o','j','j','p','f','f','j','j','o','o','o'],
-  ['o','o','o','o','j','j','f','p','p','o','o','o','o']
-];
+var MAP_TILES = [];
+var MAP_TILE_INDEX = {};
+var SELECTED_TILE = null;
+
+var CURRENT_MAP_PROFILE = null;
+var CURRENT_MAP_KEY = null;
+
+var _mapDrawScheduled = false;
+var _mapLastPlayers = null;
+var _mapLastCurId = null;
+var _mapAnimFrame = null;
+var _mapClickBoundCanvas = null;
 
 /* ─── 타일 지형 정의 ─────────────────────────────── */
 var TILE_TYPES = {
@@ -123,54 +116,115 @@ var TILE_TYPES = {
   }
 };
 
-/* ─── 기후별 수도 위치 ───────────────────────────── */
-var CLIMATE_START = {
-  cold:      { row:1, col:2 },
-  highland:  { row:1, col:7 },
-  temperate: { row:3, col:2 },
-  arid:      { row:3, col:5 },
-  monsoon:   { row:3, col:9 },
-  tropical:  { row:6, col:4 }
+/* ─── 지도 프로필: 턴 수에 따라 지도 크기 변경 ───── */
+var MAP_PROFILES = {
+  short: {
+    key:'short',
+    label:'소형 지도',
+    turnLabel:'15턴',
+    cssW:900,
+    cssH:500,
+    hexSize:31,
+    map:[
+      ['o','t','t','t','m','m','h','h','o','o','o'],
+      ['t','t','p','p','m','h','h','p','p','o','o'],
+      ['o','p','p','f','d','d','p','p','f','j','o'],
+      ['o','p','f','d','d','d','p','f','j','j','o'],
+      ['o','f','f','p','d','p','f','j','j','j','o'],
+      ['o','o','j','j','p','p','f','j','j','o','o'],
+      ['o','o','o','j','j','f','p','p','o','o','o']
+    ],
+    starts:{
+      cold:{row:1,col:1},
+      highland:{row:1,col:6},
+      temperate:{row:3,col:1},
+      arid:{row:3,col:4},
+      monsoon:{row:3,col:8},
+      tropical:{row:5,col:3}
+    }
+  },
+
+  standard: {
+    key:'standard',
+    label:'표준 지도',
+    turnLabel:'20턴',
+    cssW:1040,
+    cssH:580,
+    hexSize:29,
+    map:[
+      ['o','o','t','t','t','m','m','h','h','o','o','o','o'],
+      ['o','t','t','p','p','m','h','h','p','p','o','o','o'],
+      ['o','t','p','p','f','m','d','d','p','f','f','o','o'],
+      ['o','p','p','f','d','d','d','p','p','f','j','j','o'],
+      ['o','p','f','f','p','d','d','p','f','j','j','j','o'],
+      ['o','o','f','p','p','p','p','f','j','j','j','o','o'],
+      ['o','o','o','j','j','p','f','f','j','j','o','o','o'],
+      ['o','o','o','o','j','j','f','p','p','o','o','o','o']
+    ],
+    starts:{
+      cold:{row:1,col:2},
+      highland:{row:1,col:7},
+      temperate:{row:3,col:2},
+      arid:{row:3,col:5},
+      monsoon:{row:3,col:9},
+      tropical:{row:6,col:4}
+    }
+  },
+
+  long: {
+    key:'long',
+    label:'대형 지도',
+    turnLabel:'30턴',
+    cssW:1220,
+    cssH:680,
+    hexSize:27,
+    map:[
+      ['o','o','t','t','t','t','m','m','h','h','h','o','o','o','o'],
+      ['o','t','t','t','p','p','m','h','h','p','p','p','o','o','o'],
+      ['o','t','p','p','p','f','m','d','d','p','p','f','f','o','o'],
+      ['o','p','p','f','f','d','d','d','d','p','f','f','j','j','o'],
+      ['o','p','f','f','p','p','d','d','p','p','f','j','j','j','o'],
+      ['o','o','f','p','p','p','p','p','f','f','j','j','j','j','o'],
+      ['o','o','o','j','j','p','p','f','f','j','j','j','j','o','o'],
+      ['o','o','o','o','j','j','p','f','p','p','j','j','o','o','o'],
+      ['o','o','o','o','o','j','j','f','f','p','p','o','o','o','o'],
+      ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
+    ],
+    starts:{
+      cold:{row:1,col:2},
+      highland:{row:1,col:8},
+      temperate:{row:3,col:2},
+      arid:{row:3,col:7},
+      monsoon:{row:3,col:12},
+      tropical:{row:7,col:5}
+    }
+  }
 };
 
-/* ─── 기후별 시작 영토 ───────────────────────────── */
-var CLIMATE_TERRITORY = {
-  cold: [
-    {row:0,col:2},{row:0,col:3},{row:1,col:1},
-    {row:1,col:2},{row:1,col:3},{row:2,col:2}
-  ],
-  highland: [
-    {row:0,col:6},{row:0,col:7},{row:1,col:6},
-    {row:1,col:7},{row:1,col:8},{row:2,col:6}
-  ],
-  temperate: [
-    {row:2,col:2},{row:2,col:3},{row:3,col:1},
-    {row:3,col:2},{row:3,col:3},{row:4,col:2}
-  ],
-  arid: [
-    {row:2,col:6},{row:3,col:4},{row:3,col:5},
-    {row:3,col:6},{row:4,col:5},{row:4,col:6}
-  ],
-  monsoon: [
-    {row:2,col:9},{row:3,col:8},{row:3,col:9},
-    {row:3,col:10},{row:4,col:9},{row:4,col:10}
-  ],
-  tropical: [
-    {row:5,col:3},{row:6,col:3},{row:6,col:4},
-    {row:6,col:5},{row:7,col:4},{row:7,col:5}
-  ]
-};
+/* ─── 현재 턴 수 기준 지도 선택 ─────────────────── */
+function getMaxTurnsForMap() {
+  if (typeof G !== 'undefined' && G && G.maxTurns) {
+    return parseInt(G.maxTurns, 10);
+  }
+  return 20;
+}
 
-/* ─── 실제 타일 데이터 저장소 ────────────────────── */
-var MAP_TILES = [];
-var MAP_TILE_INDEX = {};
-var SELECTED_TILE = null;
+function getMapProfile() {
+  var turns = getMaxTurnsForMap();
 
-var _mapDrawScheduled = false;
-var _mapLastPlayers = null;
-var _mapLastCurId = null;
-var _mapAnimFrame = null;
-var _mapClickBound = false;
+  if (turns <= 15) return MAP_PROFILES.short;
+  if (turns >= 30) return MAP_PROFILES.long;
+  return MAP_PROFILES.standard;
+}
+
+function getCurrentMap() {
+  return CURRENT_MAP_PROFILE ? CURRENT_MAP_PROFILE.map : getMapProfile().map;
+}
+
+function getClimateStart(climateId) {
+  var profile = CURRENT_MAP_PROFILE || getMapProfile();
+  return profile.starts[climateId];
+}
 
 /* ─── 유틸리티 ──────────────────────────────────── */
 function hexToRgb(hex) {
@@ -204,16 +258,6 @@ function getTile(row, col) {
 
 function sameTile(a, b) {
   return a && b && a.row === b.row && a.col === b.col;
-}
-
-function tileInList(tile, list) {
-  if (!tile || !list) return false;
-
-  for (var i = 0; i < list.length; i++) {
-    if (sameTile(tile, list[i])) return true;
-  }
-
-  return false;
 }
 
 function getClimateName(climateId) {
@@ -296,14 +340,63 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+/* ─── PC 고화질 Canvas 준비 ─────────────────────── */
+function prepareCanvasForHighQuality(canvas) {
+  var profile = getMapProfile();
+  var parent = canvas.parentNode;
+  var parentW = parent ? parent.clientWidth : profile.cssW;
+
+  var maxCssW = profile.cssW;
+  var cssW = Math.min(maxCssW, Math.max(760, parentW || maxCssW));
+  var cssH = Math.round(cssW * (profile.cssH / profile.cssW));
+
+  var dpr = window.devicePixelRatio || 1;
+  var renderRatio = Math.min(dpr, 2.5);
+
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.style.maxWidth = '100%';
+  canvas.style.display = 'block';
+
+  var targetW = Math.round(cssW * renderRatio);
+  var targetH = Math.round(cssH * renderRatio);
+
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+  }
+
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(renderRatio, 0, 0, renderRatio, 0, 0);
+
+  return {
+    ctx: ctx,
+    W: cssW,
+    H: cssH,
+    ratio: renderRatio,
+    profile: profile
+  };
+}
+
 /* ─── 타일 데이터 생성 ───────────────────────────── */
-function buildMapTiles() {
+function buildMapTiles(force) {
+  var profile = getMapProfile();
+
+  if (!force && CURRENT_MAP_KEY === profile.key && MAP_TILES.length > 0) {
+    return;
+  }
+
+  CURRENT_MAP_PROFILE = profile;
+  CURRENT_MAP_KEY = profile.key;
+
   MAP_TILES = [];
   MAP_TILE_INDEX = {};
 
-  for (var row = 0; row < CIV_MAP.length; row++) {
-    for (var col = 0; col < CIV_MAP[row].length; col++) {
-      var typeCode = CIV_MAP[row][col];
+  var map = profile.map;
+
+  for (var row = 0; row < map.length; row++) {
+    for (var col = 0; col < map[row].length; col++) {
+      var typeCode = map[row][col];
       var typeDef = TILE_TYPES[typeCode] || TILE_TYPES.p;
 
       var tile = {
@@ -331,17 +424,22 @@ function buildMapTiles() {
   }
 
   markCapitalTiles();
-}
 
-function ensureMapTiles() {
-  if (!MAP_TILES || MAP_TILES.length === 0) {
-    buildMapTiles();
+  if (SELECTED_TILE) {
+    var restored = getTile(SELECTED_TILE.row, SELECTED_TILE.col);
+    SELECTED_TILE = restored || null;
   }
 }
 
+function ensureMapTiles() {
+  buildMapTiles(false);
+}
+
 function markCapitalTiles() {
-  Object.keys(CLIMATE_START).forEach(function(climateId) {
-    var pos = CLIMATE_START[climateId];
+  CLIMATE_ORDER.forEach(function(climateId) {
+    var pos = getClimateStart(climateId);
+    if (!pos) return;
+
     var tile = getTile(pos.row, pos.col);
 
     if (tile) {
@@ -349,6 +447,63 @@ function markCapitalTiles() {
       tile.capitalClimate = climateId;
     }
   });
+}
+
+/* ─── 영토 생성: 수도 주변 반경 기반 ─────────────── */
+function getHexDistance(a, b) {
+  var ac = offsetToCube(a.row, a.col);
+  var bc = offsetToCube(b.row, b.col);
+
+  return Math.max(
+    Math.abs(ac.x - bc.x),
+    Math.abs(ac.y - bc.y),
+    Math.abs(ac.z - bc.z)
+  );
+}
+
+function offsetToCube(row, col) {
+  var x = col - (row - (row & 1)) / 2;
+  var z = row;
+  var y = -x - z;
+
+  return { x:x, y:y, z:z };
+}
+
+function getTerritoryRadiusByTurns() {
+  var turns = getMaxTurnsForMap();
+
+  if (turns <= 15) return 1;
+  if (turns >= 30) return 2;
+  return 1;
+}
+
+function getClimateTerritory(climateId) {
+  var start = getClimateStart(climateId);
+  if (!start) return [];
+
+  var radius = getTerritoryRadiusByTurns();
+  var result = [];
+
+  MAP_TILES.forEach(function(tile) {
+    if (tile.type === 'o') return;
+
+    var dist = getHexDistance(start, tile);
+
+    if (dist <= radius) {
+      result.push({ row:tile.row, col:tile.col });
+    }
+  });
+
+  if (result.length < 4) {
+    MAP_TILES.forEach(function(tile) {
+      if (tile.type === 'o') return;
+      if (getHexDistance(start, tile) <= radius + 1) {
+        result.push({ row:tile.row, col:tile.col });
+      }
+    });
+  }
+
+  return result;
 }
 
 /* ─── 플레이어 데이터와 타일 데이터 연결 ─────────── */
@@ -365,12 +520,12 @@ function syncTilesWithPlayers(players) {
   players.forEach(function(player) {
     if (!player || !player.climate) return;
 
-    var territory = CLIMATE_TERRITORY[player.climate] || [];
+    var territory = getClimateTerritory(player.climate);
 
     territory.forEach(function(pos) {
       var tile = getTile(pos.row, pos.col);
 
-      if (tile) {
+      if (tile && tile.type !== 'o') {
         tile.ownerClimate = player.climate;
         tile.ownerPlayerId = player.id;
       }
@@ -380,17 +535,28 @@ function syncTilesWithPlayers(players) {
 
 /* ─── 좌표 변환 ─────────────────────────────────── */
 function getMapScale(W, H) {
-  var cols = CIV_MAP[0].length;
-  var rows = CIV_MAP.length;
+  var profile = CURRENT_MAP_PROFILE || getMapProfile();
+  var map = profile.map;
+  var rows = map.length;
+  var cols = map[0].length;
 
-  var mapWidth = MAP_OFFSET_X + cols * HEX_W + HEX_W;
-  var mapHeight = MAP_OFFSET_Y + rows * HEX_H_STEP + HEX_SIZE;
+  var hexSize = profile.hexSize;
+  var hexW = Math.sqrt(3) * hexSize;
+  var hexStep = hexSize * 1.5;
 
-  return Math.min(W / mapWidth, H / mapHeight, 1.05);
+  var naturalW = MAP_OFFSET_X + cols * hexW + hexW + 40;
+  var naturalH = MAP_OFFSET_Y + rows * hexStep + hexSize + 80;
+
+  return Math.min(W / naturalW, H / naturalH);
+}
+
+function getScaledHexSize(scale) {
+  var profile = CURRENT_MAP_PROFILE || getMapProfile();
+  return profile.hexSize * scale;
 }
 
 function hexToPixel(row, col, scale) {
-  var size = HEX_SIZE * scale;
+  var size = getScaledHexSize(scale);
   var w = Math.sqrt(3) * size;
   var step = size * 1.5;
 
@@ -428,8 +594,9 @@ function pointInHex(px, py, cx, cy, size) {
 function findTileByPoint(x, y, canvas) {
   ensureMapTiles();
 
-  var scale = getMapScale(canvas.width, canvas.height);
-  var hexSize = HEX_SIZE * scale;
+  var metrics = getCanvasCssMetrics(canvas);
+  var scale = getMapScale(metrics.W, metrics.H);
+  var hexSize = getScaledHexSize(scale);
 
   for (var i = 0; i < MAP_TILES.length; i++) {
     var tile = MAP_TILES[i];
@@ -443,22 +610,28 @@ function findTileByPoint(x, y, canvas) {
   return null;
 }
 
+function getCanvasCssMetrics(canvas) {
+  var rect = canvas.getBoundingClientRect();
+
+  return {
+    W: rect.width || MAP_W,
+    H: rect.height || MAP_H
+  };
+}
+
 /* ─── 클릭 이벤트 ───────────────────────────────── */
 function bindMapClick(canvas) {
-  if (!canvas || _mapClickBound) return;
+  if (!canvas) return;
+  if (_mapClickBoundCanvas === canvas) return;
 
-  _mapClickBound = true;
-
+  _mapClickBoundCanvas = canvas;
   canvas.style.cursor = 'pointer';
 
   canvas.addEventListener('click', function(event) {
     var rect = canvas.getBoundingClientRect();
 
-    var scaleX = canvas.width / rect.width;
-    var scaleY = canvas.height / rect.height;
-
-    var x = (event.clientX - rect.left) * scaleX;
-    var y = (event.clientY - rect.top) * scaleY;
+    var x = event.clientX - rect.left;
+    var y = event.clientY - rect.top;
 
     var clickedTile = findTileByPoint(x, y, canvas);
 
@@ -470,11 +643,8 @@ function bindMapClick(canvas) {
   canvas.addEventListener('mousemove', function(event) {
     var rect = canvas.getBoundingClientRect();
 
-    var scaleX = canvas.width / rect.width;
-    var scaleY = canvas.height / rect.height;
-
-    var x = (event.clientX - rect.left) * scaleX;
-    var y = (event.clientY - rect.top) * scaleY;
+    var x = event.clientX - rect.left;
+    var y = event.clientY - rect.top;
 
     var hoverTile = findTileByPoint(x, y, canvas);
     canvas.style.cursor = hoverTile ? 'pointer' : 'default';
@@ -509,7 +679,7 @@ function ensureTileInfoBox() {
     box.id = 'tileInfoBox';
 
     box.style.marginTop = '10px';
-    box.style.padding = '12px';
+    box.style.padding = '12px 14px';
     box.style.border = '1px solid rgba(255,255,255,0.20)';
     box.style.borderRadius = '12px';
     box.style.background = 'rgba(8,9,26,0.92)';
@@ -532,6 +702,8 @@ function showTileInfo(tile, players) {
   var box = ensureTileInfoBox();
   var tileType = TILE_TYPES[tile.type] || TILE_TYPES.p;
   var owner = getPlayerById(players, tile.ownerPlayerId);
+  var profile = CURRENT_MAP_PROFILE || getMapProfile();
+
   var ownerText = owner
     ? (owner.emoji || '👑') + ' ' + owner.name + ' / ' + owner.country
     : '없음';
@@ -546,6 +718,7 @@ function showTileInfo(tile, players) {
     '<div style="font-weight:700;font-size:15px;margin-bottom:6px;">' +
       '🧭 선택한 타일' +
     '</div>' +
+    '<div>지도 유형: ' + profile.turnLabel + ' · ' + profile.label + '</div>' +
     '<div>위치: ' + tile.row + '행 ' + tile.col + '열</div>' +
     '<div>지형: ' + tileType.icon + ' ' + tileType.name + '</div>' +
     '<div>생산량: ' + formatYield(tile.yield) + '</div>' +
@@ -554,7 +727,7 @@ function showTileInfo(tile, players) {
     '<div>건설 가능: ' + buildableText + '</div>' +
     '<div>건물: ' + (tile.buildingId || '없음') + '</div>' +
     '<div style="margin-top:8px;color:rgba(246,231,181,0.68);font-size:12px;">' +
-      '※ 이제 이 타일 데이터에 건물, 유닛, 영토 확장 정보를 저장할 수 있습니다.' +
+      '※ 이 타일 데이터에 건물, 유닛, 영토 확장 정보를 연결할 수 있습니다.' +
     '</div>';
 }
 
@@ -565,20 +738,23 @@ function drawWorldMap(canvas, players, currentPlayerId) {
   ensureMapTiles();
   syncTilesWithPlayers(players);
 
-  var ctx = canvas.getContext('2d');
-  var W = canvas.width;
-  var H = canvas.height;
+  var prepared = prepareCanvasForHighQuality(canvas);
+  var ctx = prepared.ctx;
+  var W = prepared.W;
+  var H = prepared.H;
+  var profile = prepared.profile;
+
   var scale = getMapScale(W, H);
-  var hexSize = HEX_SIZE * scale;
+  var hexSize = getScaledHexSize(scale);
 
   ctx.clearRect(0, 0, W, H);
 
   drawBackground(ctx, W, H);
-  drawMapTitle(ctx);
+  drawMapTitle(ctx, profile);
   drawAllTiles(ctx, scale, hexSize, players || []);
   drawSelectedTile(ctx, scale, hexSize);
   drawCapitals(ctx, W, H, scale, hexSize, players || [], currentPlayerId);
-  drawTileLegend(ctx, 10, H - 76);
+  drawTileLegend(ctx, 10, H - 78);
   drawRankLegend(ctx, W, H, players || []);
   drawWatermark(ctx, W, H);
 
@@ -645,9 +821,9 @@ function drawSingleTile(ctx, tile, scale, hexSize, players) {
     pos.y + hexSize
   );
 
-  grad.addColorStop(0, 'rgba(255,255,255,0.16)');
-  grad.addColorStop(0.55, 'rgba(255,255,255,0.01)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.20)');
+  grad.addColorStop(0, 'rgba(255,255,255,0.18)');
+  grad.addColorStop(0.52, 'rgba(255,255,255,0.015)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.24)');
 
   drawHexPath(ctx, pos.x, pos.y, hexSize - HEX_GAP);
   ctx.fillStyle = grad;
@@ -663,7 +839,7 @@ function drawSingleTile(ctx, tile, scale, hexSize, players) {
   ctx.lineWidth = ownerColor ? 1.6 : 1;
   ctx.strokeStyle = ownerColor
     ? rgbaFromHex(ownerColor, 0.75)
-    : 'rgba(255,255,255,0.18)';
+    : 'rgba(255,255,255,0.20)';
   ctx.stroke();
 
   ctx.textAlign = 'center';
@@ -672,7 +848,7 @@ function drawSingleTile(ctx, tile, scale, hexSize, players) {
   ctx.font = Math.round(12 * scale) + 'px sans-serif';
   ctx.fillStyle = tile.type === 'o'
     ? 'rgba(210,235,255,0.45)'
-    : 'rgba(255,255,255,0.58)';
+    : 'rgba(255,255,255,0.62)';
   ctx.fillText(tileType.icon, pos.x, pos.y - 1 * scale);
 
   drawYieldMiniIcon(ctx, tile, pos, scale);
@@ -698,7 +874,7 @@ function drawYieldMiniIcon(ctx, tile, pos, scale) {
 
   ctx.save();
   ctx.font = Math.round(8.5 * scale) + 'px sans-serif';
-  ctx.globalAlpha = 0.62;
+  ctx.globalAlpha = 0.66;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -753,7 +929,7 @@ function drawSelectedTile(ctx, scale, hexSize) {
 /* ─── 수도 / 플레이어 표시 ─────────────────────── */
 function drawCapitals(ctx, W, H, scale, hexSize, players, currentPlayerId) {
   CLIMATE_ORDER.forEach(function(climateId) {
-    var start = CLIMATE_START[climateId];
+    var start = getClimateStart(climateId);
     if (!start) return;
 
     var player = getPlayerByClimate(players, climateId);
@@ -951,26 +1127,32 @@ function getBuildingEmojiById(id) {
     temple:'🏛️',
     theater:'🎭',
     barracks:'⚔️',
-    fortress:'🏰'
+    fortress:'🏰',
+    rice_terrace:'🌾',
+    caravanserai:'🏕️',
+    windmill:'⚙️',
+    fur_post:'🦊',
+    rice_paddy:'🌿',
+    observatory:'🔭'
   };
 
   return fallback[id] || '🏗️';
 }
 
 /* ─── 제목 / 범례 / 워터마크 ─────────────────────── */
-function drawMapTitle(ctx) {
+function drawMapTitle(ctx, profile) {
   ctx.save();
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  ctx.font = 'bold 13px sans-serif';
+  ctx.font = 'bold 14px sans-serif';
   ctx.fillStyle = 'rgba(246,231,181,0.95)';
   ctx.fillText('문명 지도', 12, 10);
 
   ctx.font = '10px sans-serif';
-  ctx.fillStyle = 'rgba(210,225,245,0.62)';
-  ctx.fillText('클릭 가능한 육각형 타일 · 데이터 기반 지도', 12, 28);
+  ctx.fillStyle = 'rgba(210,225,245,0.66)';
+  ctx.fillText(profile.turnLabel + ' · ' + profile.label + ' · PC 고화질 렌더링', 12, 30);
 
   ctx.restore();
 }
@@ -1092,12 +1274,26 @@ function drawWatermark(ctx, W, H) {
   ctx.restore();
 }
 
+/* ─── 리사이즈 대응 ─────────────────────────────── */
+function requestMapRedraw() {
+  var canvas = document.getElementById('worldMap');
+  if (!canvas) return;
+
+  drawWorldMap(canvas, _mapLastPlayers || [], _mapLastCurId);
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', function() {
+    requestMapRedraw();
+  });
+}
+
 /* ─── 외부 호출 함수: 기존 이름 유지 ─────────────── */
 function scheduleMapDraw(players, currentPlayerId) {
   _mapLastPlayers = players || [];
   _mapLastCurId = currentPlayerId;
 
-  ensureMapTiles();
+  buildMapTiles(false);
   syncTilesWithPlayers(_mapLastPlayers);
 
   if (_mapDrawScheduled) return;
