@@ -1,141 +1,93 @@
 /* =========================================================
    나라 경영 시뮬레이션 · map.js
-   Canvas 기반 세계 지도 렌더링
+   문명식 육각형 타일 지도 렌더링 버전
    made by 박선생
 
-   외부에서 호출하는 함수:
-     scheduleMapDraw(players, currentPlayerId)
-       - render() 후 DOM이 준비되면 자동 호출
-       - canvasId = 'worldMap' 고정
+   사용 방법:
+     - 기존 저장소의 js/map.js 파일을 이 파일로 교체하세요.
+     - index.html 수정 없이 그대로 작동하도록 scheduleMapDraw() 이름을 유지했습니다.
 ========================================================= */
 
 /* ─── 지도 상수 ──────────────────────────────────── */
 var MAP_W = 760;
 var MAP_H = 420;
 
+var HEX_SIZE = 25;
+var HEX_GAP = 1.5;
+var HEX_W = Math.sqrt(3) * HEX_SIZE;
+var HEX_H_STEP = HEX_SIZE * 1.5;
+
+var MAP_OFFSET_X = 72;
+var MAP_OFFSET_Y = 48;
+
+var CLIMATE_ORDER = ['cold', 'highland', 'temperate', 'arid', 'monsoon', 'tropical'];
+
 /*
-  6개 영토가 전체 지도 면적을 분할합니다.
-  경계는 정규화 좌표(0~1)로 정의하며 실제 픽셀로 변환해 그립니다.
-
-  냉대  │ 고산
-  ──────┼──────────────
-  온대  │ 건조 │ 계절풍
-  ──────┴──────┴───────
-       열대 (전폭)
+  문명식 육각형 지도
+  o = 바다, t = 설원, p = 초원, f = 숲, d = 사막, m = 산악, j = 열대우림, h = 고원
 */
-
-/* 영토 경계 그리기 함수들 (ctx, W, H 를 인자로 받음) */
-var TERRITORY_DRAW = {
-
-  cold: function(ctx, W, H) {
-    /* 냉대: 상단 좌측 (시베리아·캐나다·북유럽) */
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(W * 0.50, 0);
-    ctx.bezierCurveTo(W*0.52, H*0.08,  W*0.54, H*0.22, W*0.52, H*0.33);
-    ctx.bezierCurveTo(W*0.44, H*0.36,  W*0.34, H*0.37, W*0.26, H*0.36);
-    ctx.bezierCurveTo(W*0.16, H*0.36,  W*0.06, H*0.37, W*0,    H*0.36);
-    ctx.closePath();
-  },
-
-  highland: function(ctx, W, H) {
-    /* 고산: 상단 우측 (히말라야·티베트·안데스) */
-    ctx.beginPath();
-    ctx.moveTo(W * 0.50, 0);
-    ctx.lineTo(W, 0);
-    ctx.lineTo(W, H * 0.33);
-    ctx.bezierCurveTo(W*0.82, H*0.33,  W*0.66, H*0.33, W*0.52, H*0.33);
-    ctx.bezierCurveTo(W*0.54, H*0.22,  W*0.52, H*0.08, W*0.50, 0);
-    ctx.closePath();
-  },
-
-  temperate: function(ctx, W, H) {
-    /* 온대: 좌측 중간 (서유럽·북아메리카 중위도) */
-    ctx.beginPath();
-    ctx.moveTo(0, H * 0.36);
-    ctx.bezierCurveTo(W*0.06, H*0.37,  W*0.16, H*0.36, W*0.26, H*0.36);
-    ctx.bezierCurveTo(W*0.28, H*0.46,  W*0.32, H*0.58, W*0.33, H*0.69);
-    ctx.bezierCurveTo(W*0.22, H*0.70,  W*0.10, H*0.70, W*0,    H*0.68);
-    ctx.closePath();
-  },
-
-  arid: function(ctx, W, H) {
-    /* 건조: 중앙 (북아프리카·중동·중앙아시아) */
-    ctx.beginPath();
-    ctx.moveTo(W * 0.26, H * 0.36);
-    ctx.bezierCurveTo(W*0.34, H*0.37,  W*0.44, H*0.36, W*0.52, H*0.33);
-    ctx.bezierCurveTo(W*0.66, H*0.33,  W*0.70, H*0.36, W*0.72, H*0.40);
-    ctx.bezierCurveTo(W*0.74, H*0.52,  W*0.70, H*0.64, W*0.62, H*0.69);
-    ctx.bezierCurveTo(W*0.54, H*0.70,  W*0.44, H*0.70, W*0.33, H*0.69);
-    ctx.bezierCurveTo(W*0.32, H*0.58,  W*0.28, H*0.46, W*0.26, H*0.36);
-    ctx.closePath();
-  },
-
-  monsoon: function(ctx, W, H) {
-    /* 계절풍: 우측 중간 (동아시아·인도·동남아) */
-    ctx.beginPath();
-    ctx.moveTo(W * 0.52, H * 0.33);
-    ctx.lineTo(W, H * 0.33);
-    ctx.lineTo(W, H * 0.69);
-    ctx.bezierCurveTo(W*0.88, H*0.70,  W*0.76, H*0.70, W*0.62, H*0.69);
-    ctx.bezierCurveTo(W*0.70, H*0.64,  W*0.74, H*0.52, W*0.72, H*0.40);
-    ctx.bezierCurveTo(W*0.70, H*0.36,  W*0.66, H*0.33, W*0.52, H*0.33);
-    ctx.closePath();
-  },
-
-  tropical: function(ctx, W, H) {
-    /* 열대: 하단 전폭 (적도 아프리카·아마존·동남아) */
-    ctx.beginPath();
-    ctx.moveTo(0, H * 0.68);
-    ctx.bezierCurveTo(W*0.10, H*0.70,  W*0.22, H*0.70, W*0.33, H*0.69);
-    ctx.bezierCurveTo(W*0.44, H*0.70,  W*0.54, H*0.70, W*0.62, H*0.69);
-    ctx.bezierCurveTo(W*0.76, H*0.70,  W*0.88, H*0.70, W,      H*0.69);
-    ctx.lineTo(W, H);
-    ctx.lineTo(0, H);
-    ctx.closePath();
-  }
-};
-
-/* ─── 영토 베이스 색상 (플레이어 없을 때) ────────── */
-var TERRITORY_BASE_COLOR = {
-  cold:      { fill: '#0d1f38', stroke: '#1e3a5c' },
-  highland:  { fill: '#18182e', stroke: '#2e2e56' },
-  temperate: { fill: '#0c1e0e', stroke: '#1a3a1c' },
-  arid:      { fill: '#2a1e06', stroke: '#4a3410' },
-  monsoon:   { fill: '#0e2010', stroke: '#1c3e18' },
-  tropical:  { fill: '#0a1e10', stroke: '#163a1e' }
-};
-
-/* ─── 지리적 특징 텍스처 (점·점선으로 표현) ──────── */
-var GEO_FEATURES = [
-  /* 산맥 */
-  { type:'mountain', x:0.49, y:0.21, label:'▲' },
-  { type:'mountain', x:0.52, y:0.16, label:'▲' },
-  { type:'mountain', x:0.55, y:0.12, label:'▲' },
-  { type:'mountain', x:0.14, y:0.22, label:'▲' },
-  /* 사막 */
-  { type:'desert',   x:0.35, y:0.50, label:'···' },
-  { type:'desert',   x:0.42, y:0.55, label:'···' },
-  /* 열대우림 */
-  { type:'forest',   x:0.15, y:0.80, label:'🌿' },
-  { type:'forest',   x:0.72, y:0.82, label:'🌿' },
-  /* 바다 이름 */
-  { type:'sea', x:0.08, y:0.55, label:'대서양' },
-  { type:'sea', x:0.85, y:0.55, label:'태평양' },
-  { type:'sea', x:0.46, y:0.86, label:'인도양' }
+var CIV_MAP = [
+  ['o','o','t','t','t','m','m','h','h','o','o','o','o'],
+  ['o','t','t','p','p','m','h','h','p','p','o','o','o'],
+  ['o','t','p','p','f','m','d','d','p','f','f','o','o'],
+  ['o','p','p','f','d','d','d','p','p','f','j','j','o'],
+  ['o','p','f','f','p','d','d','p','f','j','j','j','o'],
+  ['o','o','f','p','p','p','p','f','j','j','j','o','o'],
+  ['o','o','o','j','j','p','f','f','j','j','o','o','o'],
+  ['o','o','o','o','j','j','f','p','p','o','o','o','o']
 ];
 
-/* ─── 위도선·경도선 (장식용) ─────────────────────── */
-var GRID_LINES = [
-  /* 위도선 (가로) */
-  { type:'lat', y:0.095, label:'60°N', dashed:false },
-  { type:'lat', y:0.33,  label:'30°N', dashed:true  },
-  { type:'lat', y:0.495, label:'적도', dashed:false  },
-  { type:'lat', y:0.69,  label:'30°S', dashed:true  }
-];
+var TILE_TYPES = {
+  o: { id:'ocean',    name:'바다',     color:'#12395f', edge:'#1e5a88', icon:'≈' },
+  t: { id:'tundra',   name:'설원',     color:'#9fc7d7', edge:'#d4eef8', icon:'❄' },
+  p: { id:'plains',   name:'초원',     color:'#3f8d3d', edge:'#66c466', icon:'·' },
+  f: { id:'forest',   name:'숲',       color:'#1f6436', edge:'#3fa05a', icon:'♣' },
+  d: { id:'desert',   name:'사막',     color:'#b88932', edge:'#e4c15d', icon:'·' },
+  m: { id:'mountain', name:'산악',     color:'#666a74', edge:'#b8bdc8', icon:'▲' },
+  j: { id:'jungle',   name:'열대우림', color:'#157a3a', edge:'#35b85d', icon:'🌿' },
+  h: { id:'highland', name:'고원',     color:'#555372', edge:'#b0b0d8', icon:'▲' }
+};
+
+/* 기후별 수도 위치 */
+var CLIMATE_START = {
+  cold:      { row:1, col:2 },
+  highland:  { row:1, col:7 },
+  temperate: { row:3, col:2 },
+  arid:      { row:3, col:5 },
+  monsoon:   { row:3, col:9 },
+  tropical:  { row:6, col:4 }
+};
+
+/* 수도 주변 영토 확장 타일 */
+var CLIMATE_TERRITORY = {
+  cold:      [{row:0,col:2},{row:0,col:3},{row:1,col:1},{row:1,col:2},{row:1,col:3},{row:2,col:2}],
+  highland:  [{row:0,col:6},{row:0,col:7},{row:1,col:6},{row:1,col:7},{row:1,col:8},{row:2,col:6}],
+  temperate: [{row:2,col:2},{row:2,col:3},{row:3,col:1},{row:3,col:2},{row:3,col:3},{row:4,col:2}],
+  arid:      [{row:2,col:6},{row:3,col:4},{row:3,col:5},{row:3,col:6},{row:4,col:5},{row:4,col:6}],
+  monsoon:   [{row:2,col:9},{row:3,col:8},{row:3,col:9},{row:3,col:10},{row:4,col:9},{row:4,col:10}],
+  tropical:  [{row:5,col:3},{row:6,col:3},{row:6,col:4},{row:6,col:5},{row:7,col:4},{row:7,col:5}]
+};
+
+var TILE_YIELD_ICON = {
+  o: '💰',
+  t: '🔬',
+  p: '🌾',
+  f: '⚙️',
+  d: '💰',
+  m: '⚙️',
+  j: '🌾',
+  h: '🔬'
+};
+
+var BUILDING_ICON_FALLBACK = {
+  farm:'🌾', aqueduct:'💧', workshop:'🔧', foundry:'🏭', market:'🏪', harbor:'⚓',
+  library:'📚', university:'🎓', temple:'🏛️', theater:'🎭', barracks:'⚔️', fortress:'🏰',
+  rice_terrace:'🌾', caravanserai:'🏕️', windmill:'⚙️', fur_post:'🦊', rice_paddy:'🌿', observatory:'🔭'
+};
 
 /* ─── 유틸리티 ───────────────────────────────────── */
 function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string' || hex.charAt(0) !== '#') return [255, 255, 255];
   var r = parseInt(hex.slice(1,3),16);
   var g = parseInt(hex.slice(3,5),16);
   var b = parseInt(hex.slice(5,7),16);
@@ -147,462 +99,10 @@ function rgbaFromHex(hex, alpha) {
   return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+alpha+')';
 }
 
-/* ─── 메인 드로우 함수 ───────────────────────────── */
-/**
- * @param {HTMLCanvasElement} canvas
- * @param {Array}  players         - G.players 배열
- * @param {number} currentPlayerId - 현재 플레이어 id (하이라이트용, null이면 전체 순위 표시)
- */
-function drawWorldMap(canvas, players, currentPlayerId) {
-  if (!canvas) return;
-  var ctx = canvas.getContext('2d');
-  var W   = canvas.width;
-  var H   = canvas.height;
-
-  ctx.clearRect(0, 0, W, H);
-
-  /* 플레이어 → 기후 매핑 */
-  var playerByClimate = {};
-  if (players) {
-    players.forEach(function(p) {
-      playerByClimate[p.climate] = p;
-    });
-  }
-
-  /* ① 해양 배경 */
-  drawOcean(ctx, W, H);
-
-  /* ② 위도·경도선 */
-  drawGrid(ctx, W, H);
-
-  /* ③ 영토 (뒤에서 앞으로) */
-  var climateOrder = ['cold','highland','temperate','arid','monsoon','tropical'];
-  climateOrder.forEach(function(cid) {
-    drawTerritory(ctx, W, H, cid, playerByClimate[cid]);
-  });
-
-  /* ④ 영토 경계선 (위에 덧그림) */
-  drawBorders(ctx, W, H);
-
-  /* ⑤ 지리적 레이블 */
-  drawGeoLabels(ctx, W, H);
-
-  /* ⑥ 플레이어 마커 */
-  climateOrder.forEach(function(cid) {
-    var p = playerByClimate[cid];
-    if (p) drawPlayerMarker(ctx, W, H, p, p.id === currentPlayerId);
-  });
-
-  /* ⑦ 비어있는 영토 레이블 */
-  climateOrder.forEach(function(cid) {
-    if (!playerByClimate[cid]) drawEmptyLabel(ctx, W, H, cid);
-  });
-
-  /* ⑧ 범례 */
-  drawLegend(ctx, W, H, players);
-
-  /* ⑨ 워터마크 */
-  ctx.font = '10px sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.textAlign = 'right';
-  ctx.fillText('made by 박선생', W-8, H-6);
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
 
-/* ─── 해양 배경 ──────────────────────────────────── */
-function drawOcean(ctx, W, H) {
-  var grad = ctx.createLinearGradient(0, 0, W, H);
-  grad.addColorStop(0,   '#04101e');
-  grad.addColorStop(0.5, '#061426');
-  grad.addColorStop(1,   '#081832');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
-
-  /* 해양 반짝임 효과 */
-  ctx.globalAlpha = 0.04;
-  for (var i = 0; i < 8; i++) {
-    var gx = ctx.createLinearGradient(0, (H/8)*i, W, (H/8)*(i+1));
-    gx.addColorStop(0,   'rgba(100,160,255,0)');
-    gx.addColorStop(0.5, 'rgba(100,160,255,0.6)');
-    gx.addColorStop(1,   'rgba(100,160,255,0)');
-    ctx.fillStyle = gx;
-    ctx.fillRect(0, (H/8)*i, W, H/8);
-  }
-  ctx.globalAlpha = 1;
-}
-
-/* ─── 위도·경도선 ────────────────────────────────── */
-function drawGrid(ctx, W, H) {
-  ctx.save();
-  ctx.strokeStyle = 'rgba(100,140,200,0.12)';
-  ctx.lineWidth   = 0.8;
-
-  /* 위도선 */
-  GRID_LINES.forEach(function(gl) {
-    ctx.setLineDash(gl.dashed ? [4,6] : []);
-    ctx.beginPath();
-    ctx.moveTo(0, H * gl.y);
-    ctx.lineTo(W, H * gl.y);
-    ctx.stroke();
-
-    /* 레이블 */
-    ctx.setLineDash([]);
-    ctx.font       = '9px sans-serif';
-    ctx.fillStyle  = 'rgba(120,160,220,0.45)';
-    ctx.textAlign  = 'left';
-    ctx.fillText(gl.label, 4, H * gl.y - 2);
-  });
-
-  /* 경도선 */
-  ctx.setLineDash([3, 7]);
-  ctx.strokeStyle = 'rgba(100,140,200,0.08)';
-  [0.15, 0.30, 0.45, 0.60, 0.75, 0.88].forEach(function(x) {
-    ctx.beginPath();
-    ctx.moveTo(W * x, 0);
-    ctx.lineTo(W * x, H);
-    ctx.stroke();
-  });
-  ctx.setLineDash([]);
-  ctx.restore();
-}
-
-/* ─── 영토 채우기 ────────────────────────────────── */
-function drawTerritory(ctx, W, H, climateId, player) {
-  var base = TERRITORY_BASE_COLOR[climateId];
-  var cl   = CLIMATES[climateId];
-  var draw = TERRITORY_DRAW[climateId];
-  if (!draw) return;
-
-  ctx.save();
-
-  /* 기본 채우기 */
-  draw(ctx, W, H);
-  ctx.fillStyle = base.fill;
-  ctx.fill();
-
-  /* 플레이어 색상 오버레이 */
-  if (player) {
-    draw(ctx, W, H);
-    var grad = ctx.createRadialGradient(
-      cl.mapX * (W/MAP_W), cl.mapY * (H/MAP_H), 10,
-      cl.mapX * (W/MAP_W), cl.mapY * (H/MAP_H), W * 0.30
-    );
-    grad.addColorStop(0,   rgbaFromHex(player.color, 0.38));
-    grad.addColorStop(0.6, rgbaFromHex(player.color, 0.18));
-    grad.addColorStop(1,   rgbaFromHex(player.color, 0.04));
-    ctx.fillStyle = grad;
-    ctx.fill();
-  }
-
-  /* 기후 고유 텍스처 패턴 */
-  drawClimateTexture(ctx, W, H, climateId, cl, player);
-
-  ctx.restore();
-}
-
-/* ─── 기후 텍스처 ────────────────────────────────── */
-function drawClimateTexture(ctx, W, H, cid, cl, player) {
-  var cx = cl.mapX * (W / MAP_W);
-  var cy = cl.mapY * (H / MAP_H);
-  var alpha = player ? 0.18 : 0.10;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font        = '11px sans-serif';
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-
-  var patterns = {
-    cold:      ['❄','❄','❄','❄'],
-    highland:  ['▲','▲','▲'],
-    temperate: ['·','·','·','·'],
-    arid:      ['·','·','·'],
-    monsoon:   ['〜','〜','〜'],
-    tropical:  ['🌿','🌿','🌿']
-  };
-  var pat = patterns[cid] || [];
-  var offsets = [
-    [-30,-20],[20,-15],[-15,18],[25,22],[0,-5],[-20,5],[30,-5]
-  ];
-  for (var i = 0; i < Math.min(pat.length, offsets.length); i++) {
-    ctx.globalAlpha = alpha * (0.7 + Math.random() * 0.3);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(pat[i], cx + offsets[i][0]*W/MAP_W, cy + offsets[i][1]*H/MAP_H);
-  }
-
-  ctx.restore();
-}
-
-/* ─── 영토 경계선 ────────────────────────────────── */
-function drawBorders(ctx, W, H) {
-  ctx.save();
-  ctx.lineWidth   = 1.2;
-  ctx.strokeStyle = 'rgba(200,220,255,0.20)';
-  ctx.setLineDash([]);
-
-  Object.keys(TERRITORY_DRAW).forEach(function(cid) {
-    TERRITORY_DRAW[cid](ctx, W, H);
-    ctx.stroke();
-  });
-
-  /* 해안선 강조 */
-  ctx.lineWidth   = 0.6;
-  ctx.strokeStyle = 'rgba(100,160,255,0.30)';
-  Object.keys(TERRITORY_DRAW).forEach(function(cid) {
-    TERRITORY_DRAW[cid](ctx, W, H);
-    ctx.stroke();
-  });
-
-  ctx.restore();
-}
-
-/* ─── 지리 레이블 (바다 이름 등) ─────────────────── */
-function drawGeoLabels(ctx, W, H) {
-  ctx.save();
-  ctx.font        = '9px sans-serif';
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-
-  GEO_FEATURES.forEach(function(f) {
-    var x = f.x * W;
-    var y = f.y * H;
-    if (f.type === 'sea') {
-      ctx.fillStyle = 'rgba(100,150,220,0.35)';
-      ctx.font = 'italic 9px sans-serif';
-      ctx.fillText(f.label, x, y);
-    } else if (f.type === 'mountain') {
-      ctx.fillStyle = 'rgba(200,200,220,0.30)';
-      ctx.font = '10px sans-serif';
-      ctx.fillText(f.label, x, y);
-    } else if (f.type === 'desert') {
-      ctx.fillStyle = 'rgba(200,180,100,0.22)';
-      ctx.font = '9px sans-serif';
-      ctx.fillText(f.label, x, y);
-    }
-  });
-
-  ctx.restore();
-}
-
-/* ─── 비어있는 영토 레이블 ───────────────────────── */
-function drawEmptyLabel(ctx, W, H, cid) {
-  var cl = CLIMATES[cid];
-  var x  = cl.mapX * (W / MAP_W);
-  var y  = cl.mapY * (H / MAP_H);
-
-  ctx.save();
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-
-  /* 기후 이모지 (작게) */
-  ctx.font      = '16px sans-serif';
-  ctx.globalAlpha = 0.35;
-  ctx.fillText(cl.emoji, x, y);
-
-  /* 기후 이름 */
-  ctx.font        = '9px sans-serif';
-  ctx.fillStyle   = 'rgba(180,180,200,0.40)';
-  ctx.globalAlpha = 1;
-  ctx.fillText(cl.name + ' 기후', x, y + 16);
-
-  ctx.restore();
-}
-
-/* ─── 플레이어 마커 ──────────────────────────────── */
-function drawPlayerMarker(ctx, W, H, player, isHighlight) {
-  var cl = CLIMATES[player.climate];
-  var cx = cl.mapX * (W / MAP_W);
-  var cy = cl.mapY * (H / MAP_H);
-
-  ctx.save();
-
-  /* 하이라이트 펄스 링 */
-  if (isHighlight) {
-    var t   = (Date.now() % 2000) / 2000;
-    var rad = 28 + t * 18;
-    var rg  = ctx.createRadialGradient(cx, cy, rad*0.5, cx, cy, rad);
-    rg.addColorStop(0,   rgbaFromHex(player.color, 0.4 * (1-t)));
-    rg.addColorStop(1,   rgbaFromHex(player.color, 0));
-    ctx.fillStyle = rg;
-    ctx.beginPath();
-    ctx.arc(cx, cy, rad, 0, Math.PI*2);
-    ctx.fill();
-  }
-
-  /* 영토 원형 배경 */
-  var markerR = isHighlight ? 28 : 24;
-  ctx.shadowColor = player.color;
-  ctx.shadowBlur  = isHighlight ? 18 : 10;
-  ctx.beginPath();
-  ctx.arc(cx, cy, markerR, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(8,9,26,0.82)';
-  ctx.fill();
-  ctx.lineWidth   = isHighlight ? 2.5 : 1.8;
-  ctx.strokeStyle = player.color;
-  ctx.stroke();
-  ctx.shadowBlur  = 0;
-
-  /* 플레이어 이모지 */
-  ctx.font        = (isHighlight ? '16px' : '14px') + ' sans-serif';
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(player.emoji, cx, cy);
-
-  /* 정보 카드 (마커 아래) */
-  drawInfoCard(ctx, W, H, cx, cy + markerR + 4, player, isHighlight);
-
-  ctx.restore();
-}
-
-/* ─── 플레이어 정보 카드 ─────────────────────────── */
-function drawInfoCard(ctx, W, H, cx, topY, player, isHighlight) {
-  var cardW = isHighlight ? 110 : 96;
-  var cardH = 44;
-  var x     = cx - cardW / 2;
-  var y     = topY;
-
-  /* 화면 밖으로 나가지 않도록 조정 */
-  if (x < 2)         x = 2;
-  if (x + cardW > W - 2) x = W - cardW - 2;
-  if (y + cardH > H - 2) y = topY - cardH - 48;
-
-  ctx.save();
-
-  /* 카드 배경 */
-  ctx.fillStyle = 'rgba(8,9,26,0.88)';
-  roundRect(ctx, x, y, cardW, cardH, 5);
-  ctx.fill();
-
-  ctx.lineWidth   = isHighlight ? 1.5 : 1;
-  ctx.strokeStyle = rgbaFromHex(player.color, isHighlight ? 0.8 : 0.45);
-  roundRect(ctx, x, y, cardW, cardH, 5);
-  ctx.stroke();
-
-  /* 플레이어 이름 */
-  ctx.font        = 'bold 9px sans-serif';
-  ctx.fillStyle   = isHighlight ? player.color : '#e8dfc8';
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'top';
-  var name = player.name.length > 7 ? player.name.slice(0,7) + '…' : player.name;
-  ctx.fillText(name, x + cardW/2, y + 4);
-
-  /* 나라 이름 */
-  ctx.font      = '8px sans-serif';
-  ctx.fillStyle = rgbaFromHex(player.color, 0.75);
-  var country = player.country.length > 8 ? player.country.slice(0,8)+'…' : player.country;
-  ctx.fillText(country, x + cardW/2, y + 15);
-
-  /* 종합 국력 */
-  ctx.font      = 'bold 11px sans-serif';
-  ctx.fillStyle = '#f0c040';
-  ctx.fillText('★ ' + (player.scores ? player.scores.total : 0), x + cardW/2, y + 26);
-
-  /* 자원 미니바 */
-  drawMiniResBar(ctx, x + 6, y + 38, cardW - 12, player);
-
-  ctx.restore();
-}
-
-/* ─── 자원 미니바 ────────────────────────────────── */
-function drawMiniResBar(ctx, x, y, w, player) {
-  var res    = player.resources || {};
-  var items  = [
-    { key:'food',       color:'#60d060', val: Math.floor(res.food       || 0) },
-    { key:'gold',       color:'#f0c040', val: Math.floor(res.gold       || 0) },
-    { key:'production', color:'#80aac8', val: Math.floor(res.production || 0) },
-    { key:'science',    color:'#50a8e8', val: Math.floor(res.science    || 0) },
-    { key:'culture',    color:'#b050e8', val: Math.floor(res.culture    || 0) }
-  ];
-
-  var maxVal = Math.max.apply(null, items.map(function(i){ return i.val; }).concat([1]));
-  var segW   = (w - (items.length - 1) * 2) / items.length;
-
-  ctx.save();
-  ctx.textAlign   = 'center';
-  ctx.textBaseline = 'middle';
-
-  items.forEach(function(item, idx) {
-    var sx  = x + idx * (segW + 2);
-    var pct = Math.min(1, item.val / maxVal);
-    var bh  = 3;
-    var by  = y - bh;
-
-    /* 배경 */
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.fillRect(sx, by, segW, bh);
-
-    /* 값 바 */
-    ctx.fillStyle = item.color;
-    ctx.fillRect(sx, by, segW * pct, bh);
-  });
-
-  ctx.restore();
-}
-
-/* ─── 범례 ───────────────────────────────────────── */
-function drawLegend(ctx, W, H, players) {
-  if (!players || players.length === 0) return;
-
-  /* 점수 순위 미니 리스트 */
-  var sorted = players.slice().sort(function(a,b){
-    return (b.scores ? b.scores.total : 0) - (a.scores ? a.scores.total : 0);
-  });
-
-  var legendW = 130;
-  var legendH = 14 + sorted.length * 16;
-  var lx = W - legendW - 6;
-  var ly = H - legendH - 6;
-
-  ctx.save();
-
-  /* 배경 */
-  ctx.fillStyle = 'rgba(6,8,20,0.82)';
-  roundRect(ctx, lx, ly, legendW, legendH, 5);
-  ctx.fill();
-
-  ctx.lineWidth   = 0.8;
-  ctx.strokeStyle = 'rgba(240,192,64,0.22)';
-  roundRect(ctx, lx, ly, legendW, legendH, 5);
-  ctx.stroke();
-
-  /* 제목 */
-  ctx.font        = 'bold 9px sans-serif';
-  ctx.fillStyle   = 'rgba(240,192,64,0.7)';
-  ctx.textAlign   = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('🏆 국력 순위', lx + 7, ly + 4);
-
-  /* 각 플레이어 */
-  sorted.forEach(function(p, idx) {
-    var ry = ly + 14 + idx * 16;
-    var total = p.scores ? p.scores.total : 0;
-    var maxTotal = sorted[0].scores ? sorted[0].scores.total : 1;
-
-    /* 바 배경 */
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.fillRect(lx+7, ry+3, legendW-14, 9);
-
-    /* 바 값 */
-    var barW = Math.max(4, (legendW-14) * (total / Math.max(maxTotal, 1)));
-    ctx.fillStyle = rgbaFromHex(p.color, 0.65);
-    ctx.fillRect(lx+7, ry+3, barW, 9);
-
-    /* 텍스트: 순위 + 이름 + 점수 */
-    ctx.font        = '8px sans-serif';
-    ctx.fillStyle   = '#e8dfc8';
-    ctx.textAlign   = 'left';
-    ctx.textBaseline = 'middle';
-    var label = (idx+1)+'. '+p.emoji+' '+(p.name.length>5?p.name.slice(0,5)+'…':p.name);
-    ctx.fillText(label, lx+9, ry+7);
-
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#f0c040';
-    ctx.fillText(total, lx + legendW - 4, ry + 7);
-  });
-
-  ctx.restore();
-}
-
-/* ─── roundRect 헬퍼 ─────────────────────────────── */
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -617,53 +117,616 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/* ─── 외부 진입점 ────────────────────────────────── */
+function hexToPixel(row, col, scale) {
+  var size = HEX_SIZE * scale;
+  var w = Math.sqrt(3) * size;
+  var step = size * 1.5;
+  return {
+    x: MAP_OFFSET_X * scale + col * w + (row % 2) * (w / 2),
+    y: MAP_OFFSET_Y * scale + row * step
+  };
+}
 
-var _mapAnimId = null;
-var _mapLastPlayers = null;
-var _mapLastCurId   = null;
-
-/**
- * render() 호출 직후 사용.
- * DOM에 canvas#worldMap 이 삽입된 뒤 그림을 그립니다.
- * highlight=true 면 currentPlayerId 영토에 펄스 애니메이션 적용.
- *
- * @param {Array}  players
- * @param {number|null} currentPlayerId
- */
-function scheduleMapDraw(players, currentPlayerId) {
-  /* 이전 애니메이션 루프 중단 */
-  if (_mapAnimId) {
-    cancelAnimationFrame(_mapAnimId);
-    _mapAnimId = null;
+function drawHexPath(ctx, x, y, size) {
+  ctx.beginPath();
+  for (var i = 0; i < 6; i++) {
+    var angle = Math.PI / 180 * (60 * i - 30);
+    var px = x + size * Math.cos(angle);
+    var py = y + size * Math.sin(angle);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
   }
+  ctx.closePath();
+}
 
-  _mapLastPlayers = players ? players.slice() : [];
-  _mapLastCurId   = currentPlayerId != null ? currentPlayerId : null;
+function getMapScale(W, H) {
+  var cols = CIV_MAP[0].length;
+  var rows = CIV_MAP.length;
+  var mapWidth = MAP_OFFSET_X + cols * HEX_W + HEX_W;
+  var mapHeight = MAP_OFFSET_Y + rows * HEX_H_STEP + HEX_SIZE;
+  return Math.min(W / mapWidth, H / mapHeight, 1.05);
+}
 
-  /* 펄스 애니메이션이 필요한 경우 (현재 플레이어 있음) */
-  var animate = (currentPlayerId != null);
+function sameTile(a, b) {
+  return a && b && a.row === b.row && a.col === b.col;
+}
 
-  function loop() {
-    var canvas = document.getElementById('worldMap');
-    if (!canvas) return; /* 화면이 바뀌었으면 중단 */
-    drawWorldMap(canvas, _mapLastPlayers, _mapLastCurId);
-    if (animate) {
-      _mapAnimId = requestAnimationFrame(loop);
+function tileInList(tile, list) {
+  if (!list) return false;
+  for (var i = 0; i < list.length; i++) {
+    if (sameTile(tile, list[i])) return true;
+  }
+  return false;
+}
+
+function getPlayerColor(player, climateId) {
+  if (player && player.color) return player.color;
+  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId] && CLIMATES[climateId].color) {
+    return CLIMATES[climateId].color;
+  }
+  return '#f0c040';
+}
+
+function getClimateName(climateId) {
+  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) return CLIMATES[climateId].name;
+  return climateId;
+}
+
+function getClimateEmoji(climateId) {
+  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) return CLIMATES[climateId].emoji;
+  return '🏛️';
+}
+
+function getBuildingCatalog() {
+  var list = [];
+  if (typeof BUILDINGS !== 'undefined' && BUILDINGS) list = list.concat(BUILDINGS);
+  if (typeof UNIQUE_BUILDINGS !== 'undefined' && UNIQUE_BUILDINGS) list = list.concat(UNIQUE_BUILDINGS);
+  return list;
+}
+
+function getBuildingEmojiById(id) {
+  var catalog = getBuildingCatalog();
+  for (var i = 0; i < catalog.length; i++) {
+    if (catalog[i].id === id) return catalog[i].emoji || BUILDING_ICON_FALLBACK[id] || '🏗️';
+  }
+  return BUILDING_ICON_FALLBACK[id] || '🏗️';
+}
+
+function pushBuildingId(result, key, value) {
+  if (!key) return;
+  if (value === false || value === 0 || value === null || typeof value === 'undefined') return;
+  result.push(key);
+}
+
+function getPlayerBuildingIds(player) {
+  if (!player) return [];
+  var result = [];
+  var candidates = [player.buildings, player.builtBuildings, player.ownedBuildings, player.buildingIds];
+
+  candidates.forEach(function(src) {
+    if (!src) return;
+    if (Array.isArray(src)) {
+      src.forEach(function(item) {
+        if (typeof item === 'string') result.push(item);
+        else if (item && item.id) result.push(item.id);
+      });
+    } else if (typeof src === 'object') {
+      Object.keys(src).forEach(function(key) {
+        pushBuildingId(result, key, src[key]);
+      });
     }
-  }
+  });
 
-  /* DOM 업데이트 후 첫 프레임 */
-  requestAnimationFrame(function() {
-    var canvas = document.getElementById('worldMap');
-    if (!canvas) return;
-    loop();
+  /* 중복 제거 */
+  var seen = {};
+  return result.filter(function(id) {
+    if (seen[id]) return false;
+    seen[id] = true;
+    return true;
   });
 }
 
-/**
- * 애니메이션 없이 1회만 그리기 (이벤트·요약 화면용)
- */
-function drawMapOnce(players) {
-  scheduleMapDraw(players, null);
+function getPlayerTechCount(player) {
+  if (!player) return 0;
+  var src = player.techs || player.technologies || player.researchedTechs || player.doneTechs;
+  if (!src) return 0;
+  if (Array.isArray(src)) return src.length;
+  if (typeof src === 'object') {
+    return Object.keys(src).filter(function(k){ return !!src[k]; }).length;
+  }
+  return 0;
+}
+
+/* ─── 메인 드로우 함수 ───────────────────────────── */
+function drawWorldMap(canvas, players, currentPlayerId) {
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width;
+  var H = canvas.height;
+  var scale = getMapScale(W, H);
+  var hexSize = HEX_SIZE * scale;
+
+  ctx.clearRect(0, 0, W, H);
+
+  var playerByClimate = {};
+  if (players) {
+    players.forEach(function(p) {
+      if (!p || !p.climate) return;
+      if (!playerByClimate[p.climate]) playerByClimate[p.climate] = [];
+      playerByClimate[p.climate].push(p);
+    });
+  }
+
+  drawCivOcean(ctx, W, H);
+  drawSoftGrid(ctx, W, H);
+  drawTiles(ctx, W, H, scale, hexSize, playerByClimate);
+  drawTerritoryOutlines(ctx, scale, hexSize, playerByClimate);
+  drawCapitals(ctx, W, H, scale, hexSize, playerByClimate, currentPlayerId);
+  drawMapTitle(ctx, W, H);
+  drawLegend(ctx, W, H, players);
+
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.textAlign = 'right';
+  ctx.fillText('made by 박선생', W - 8, H - 6);
+}
+
+/* ─── 배경 ───────────────────────────────────────── */
+function drawCivOcean(ctx, W, H) {
+  var grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#04101e');
+  grad.addColorStop(0.45, '#071a2f');
+  grad.addColorStop(1, '#10243a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.globalAlpha = 0.08;
+  ctx.strokeStyle = '#88c8ff';
+  ctx.lineWidth = 1;
+  for (var y = 24; y < H; y += 34) {
+    ctx.beginPath();
+    for (var x = 0; x <= W; x += 16) {
+      var yy = y + Math.sin((x + y) / 42) * 4;
+      if (x === 0) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSoftGrid(ctx, W, H) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 9]);
+  for (var x = 30; x < W; x += 90) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (var y = 30; y < H; y += 70) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+/* ─── 타일 ───────────────────────────────────────── */
+function drawTiles(ctx, W, H, scale, hexSize, playerByClimate) {
+  for (var row = 0; row < CIV_MAP.length; row++) {
+    for (var col = 0; col < CIV_MAP[row].length; col++) {
+      drawSingleTile(ctx, row, col, scale, hexSize, playerByClimate);
+    }
+  }
+}
+
+function drawSingleTile(ctx, row, col, scale, hexSize, playerByClimate) {
+  var code = CIV_MAP[row][col];
+  var tile = TILE_TYPES[code] || TILE_TYPES.p;
+  var pos = hexToPixel(row, col, scale);
+  var ownerInfo = findOwnerClimate(row, col, playerByClimate);
+
+  ctx.save();
+
+  drawHexPath(ctx, pos.x, pos.y, hexSize - HEX_GAP);
+  ctx.fillStyle = tile.color;
+  ctx.fill();
+
+  /* 지형별 가벼운 입체감 */
+  var grad = ctx.createLinearGradient(pos.x - hexSize, pos.y - hexSize, pos.x + hexSize, pos.y + hexSize);
+  grad.addColorStop(0, 'rgba(255,255,255,0.16)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0.01)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.20)');
+  drawHexPath(ctx, pos.x, pos.y, hexSize - HEX_GAP);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  /* 소유 영토 색상 오버레이 */
+  if (ownerInfo) {
+    drawHexPath(ctx, pos.x, pos.y, hexSize - HEX_GAP);
+    ctx.fillStyle = rgbaFromHex(ownerInfo.color, 0.25);
+    ctx.fill();
+  }
+
+  ctx.lineWidth = ownerInfo ? 1.6 : 1;
+  ctx.strokeStyle = ownerInfo ? rgbaFromHex(ownerInfo.color, 0.75) : 'rgba(255,255,255,0.18)';
+  drawHexPath(ctx, pos.x, pos.y, hexSize - HEX_GAP);
+  ctx.stroke();
+
+  /* 지형 아이콘 */
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = Math.round(12 * scale) + 'px sans-serif';
+  ctx.fillStyle = code === 'o' ? 'rgba(210,235,255,0.45)' : 'rgba(255,255,255,0.58)';
+  ctx.fillText(tile.icon, pos.x, pos.y - 1 * scale);
+
+  /* 생산량 힌트 */
+  if (code !== 'o') {
+    ctx.font = Math.round(9 * scale) + 'px sans-serif';
+    ctx.globalAlpha = 0.55;
+    ctx.fillText(TILE_YIELD_ICON[code] || '·', pos.x + 12 * scale, pos.y + 10 * scale);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
+
+function findOwnerClimate(row, col, playerByClimate) {
+  for (var i = 0; i < CLIMATE_ORDER.length; i++) {
+    var cid = CLIMATE_ORDER[i];
+    var list = playerByClimate[cid];
+    if (!list || list.length === 0) continue;
+    if (tileInList({row:row, col:col}, CLIMATE_TERRITORY[cid])) {
+      return { climateId: cid, color: getPlayerColor(list[0], cid) };
+    }
+  }
+  return null;
+}
+
+function drawTerritoryOutlines(ctx, scale, hexSize, playerByClimate) {
+  CLIMATE_ORDER.forEach(function(cid) {
+    var players = playerByClimate[cid];
+    var hasPlayer = players && players.length > 0;
+    var color = hasPlayer ? getPlayerColor(players[0], cid) : (CLIMATES && CLIMATES[cid] ? CLIMATES[cid].color : '#ffffff');
+    var territory = CLIMATE_TERRITORY[cid] || [];
+
+    ctx.save();
+    ctx.lineWidth = hasPlayer ? 2.2 : 1.1;
+    ctx.strokeStyle = hasPlayer ? rgbaFromHex(color, 0.75) : 'rgba(255,255,255,0.16)';
+    territory.forEach(function(t) {
+      var pos = hexToPixel(t.row, t.col, scale);
+      drawHexPath(ctx, pos.x, pos.y, hexSize - 0.6);
+      ctx.stroke();
+    });
+    ctx.restore();
+  });
+}
+
+/* ─── 수도 / 플레이어 ───────────────────────────── */
+function drawCapitals(ctx, W, H, scale, hexSize, playerByClimate, currentPlayerId) {
+  CLIMATE_ORDER.forEach(function(cid) {
+    var players = playerByClimate[cid];
+    var start = CLIMATE_START[cid];
+    if (!start) return;
+
+    if (!players || players.length === 0) {
+      drawEmptyCapital(ctx, scale, hexSize, cid, start);
+      return;
+    }
+
+    players.forEach(function(player, idx) {
+      drawPlayerCapital(ctx, W, H, scale, hexSize, cid, start, player, idx, player.id === currentPlayerId);
+    });
+  });
+}
+
+function drawEmptyCapital(ctx, scale, hexSize, cid, start) {
+  var pos = hexToPixel(start.row, start.col, scale);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.45;
+  ctx.font = Math.round(18 * scale) + 'px sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(getClimateEmoji(cid), pos.x, pos.y - 2 * scale);
+  ctx.font = Math.round(9 * scale) + 'px sans-serif';
+  ctx.fillText(getClimateName(cid), pos.x, pos.y + 18 * scale);
+  ctx.restore();
+}
+
+function drawPlayerCapital(ctx, W, H, scale, hexSize, cid, start, player, stackIndex, isHighlight) {
+  var pos = hexToPixel(start.row, start.col, scale);
+  var color = getPlayerColor(player, cid);
+  var dx = stackIndex * 15 * scale;
+  var dy = stackIndex * 8 * scale;
+  var cx = pos.x + dx;
+  var cy = pos.y + dy;
+  var r = isHighlight ? 19 * scale : 16 * scale;
+
+  ctx.save();
+
+  /* 현재 차례 강조 링 */
+  if (isHighlight) {
+    var t = (Date.now() % 1800) / 1800;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 12 * scale + t * 8 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = rgbaFromHex(color, 0.22 * (1 - t));
+    ctx.fill();
+  }
+
+  /* 수도가 위치한 타일 강조 */
+  drawHexPath(ctx, pos.x, pos.y, hexSize - 2 * scale);
+  ctx.fillStyle = rgbaFromHex(color, isHighlight ? 0.45 : 0.32);
+  ctx.fill();
+  ctx.lineWidth = isHighlight ? 3 : 2;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+
+  /* 도시 원 */
+  ctx.shadowColor = color;
+  ctx.shadowBlur = isHighlight ? 20 : 12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(7,9,22,0.92)';
+  ctx.fill();
+  ctx.lineWidth = isHighlight ? 2.4 : 1.7;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  /* 왕관/수도 아이콘 */
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = Math.round((isHighlight ? 16 : 14) * scale) + 'px sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(player.emoji || '👑', cx, cy - 1 * scale);
+
+  drawBuildingIcons(ctx, scale, cid, start, player, color);
+  drawInfoCard(ctx, W, H, cx, cy + r + 5 * scale, player, color, isHighlight, scale);
+
+  ctx.restore();
+}
+
+function drawBuildingIcons(ctx, scale, cid, start, player, color) {
+  var ids = getPlayerBuildingIds(player);
+  if (ids.length === 0) return;
+
+  var slots = [
+    {row:start.row-1, col:start.col},
+    {row:start.row,   col:start.col+1},
+    {row:start.row+1, col:start.col},
+    {row:start.row,   col:start.col-1},
+    {row:start.row-1, col:start.col-1},
+    {row:start.row+1, col:start.col+1}
+  ];
+
+  ctx.save();
+  ids.slice(0, 6).forEach(function(id, idx) {
+    var slot = slots[idx];
+    if (!slot || slot.row < 0 || slot.row >= CIV_MAP.length || slot.col < 0 || slot.col >= CIV_MAP[slot.row].length) return;
+    var pos = hexToPixel(slot.row, slot.col, scale);
+    var rr = 10 * scale;
+
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, rr, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(5,7,18,0.82)';
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = rgbaFromHex(color, 0.75);
+    ctx.stroke();
+
+    ctx.font = Math.round(11 * scale) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(getBuildingEmojiById(id), pos.x, pos.y);
+  });
+  ctx.restore();
+}
+
+function drawInfoCard(ctx, W, H, cx, topY, player, color, isHighlight, scale) {
+  var cardW = (isHighlight ? 116 : 104) * scale;
+  var cardH = 48 * scale;
+  var x = clamp(cx - cardW / 2, 4, W - cardW - 4);
+  var y = topY;
+  if (y + cardH > H - 6) y = topY - cardH - 52 * scale;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(8,9,26,0.90)';
+  roundRect(ctx, x, y, cardW, cardH, 7 * scale);
+  ctx.fill();
+
+  ctx.lineWidth = isHighlight ? 1.6 : 1;
+  ctx.strokeStyle = rgbaFromHex(color, isHighlight ? 0.9 : 0.55);
+  roundRect(ctx, x, y, cardW, cardH, 7 * scale);
+  ctx.stroke();
+
+  var name = player.name || '플레이어';
+  var country = player.country || '문명';
+  if (name.length > 7) name = name.slice(0, 7) + '…';
+  if (country.length > 8) country = country.slice(0, 8) + '…';
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold ' + Math.round(10 * scale) + 'px sans-serif';
+  ctx.fillStyle = isHighlight ? color : '#e8dfc8';
+  ctx.fillText(name, x + cardW / 2, y + 5 * scale);
+
+  ctx.font = Math.round(8.5 * scale) + 'px sans-serif';
+  ctx.fillStyle = rgbaFromHex(color, 0.82);
+  ctx.fillText(country, x + cardW / 2, y + 18 * scale);
+
+  ctx.font = 'bold ' + Math.round(11 * scale) + 'px sans-serif';
+  ctx.fillStyle = '#f0c040';
+  var total = player.scores ? player.scores.total : 0;
+  var techCount = getPlayerTechCount(player);
+  ctx.fillText('★ ' + total + '  🔬' + techCount, x + cardW / 2, y + 31 * scale);
+
+  drawMiniResBar(ctx, x + 8 * scale, y + 43 * scale, cardW - 16 * scale, player, scale);
+  ctx.restore();
+}
+
+function drawMiniResBar(ctx, x, y, w, player, scale) {
+  var res = player.resources || {};
+  var items = [
+    { key:'food',       color:'#60d060', val: Math.floor(res.food || 0) },
+    { key:'gold',       color:'#f0c040', val: Math.floor(res.gold || 0) },
+    { key:'production', color:'#80aac8', val: Math.floor(res.production || 0) },
+    { key:'science',    color:'#50a8e8', val: Math.floor(res.science || 0) },
+    { key:'culture',    color:'#b050e8', val: Math.floor(res.culture || 0) }
+  ];
+  var maxVal = Math.max.apply(null, items.map(function(i){ return i.val; }).concat([1]));
+  var gap = 2 * scale;
+  var segW = (w - (items.length - 1) * gap) / items.length;
+  var bh = 3 * scale;
+
+  items.forEach(function(item, idx) {
+    var sx = x + idx * (segW + gap);
+    var pct = Math.min(1, item.val / Math.max(maxVal, 1));
+    ctx.fillStyle = 'rgba(255,255,255,0.09)';
+    ctx.fillRect(sx, y - bh, segW, bh);
+    ctx.fillStyle = item.color;
+    ctx.fillRect(sx, y - bh, segW * pct, bh);
+  });
+}
+
+/* ─── 제목 / 범례 ────────────────────────────────── */
+function drawMapTitle(ctx, W, H) {
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillStyle = 'rgba(246,231,181,0.95)';
+  ctx.fillText('문명 지도', 12, 10);
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = 'rgba(210,225,245,0.58)';
+  ctx.fillText('육각형 타일 · 수도 · 영토 · 건물 표시', 12, 28);
+  ctx.restore();
+}
+
+function drawLegend(ctx, W, H, players) {
+  ctx.save();
+
+  drawTileLegend(ctx, 10, H - 74);
+
+  if (!players || players.length === 0) {
+    ctx.restore();
+    return;
+  }
+
+  var sorted = players.slice().sort(function(a,b) {
+    return (b.scores ? b.scores.total : 0) - (a.scores ? a.scores.total : 0);
+  });
+
+  var legendW = 140;
+  var legendH = 16 + sorted.length * 17;
+  var lx = W - legendW - 7;
+  var ly = H - legendH - 7;
+
+  ctx.fillStyle = 'rgba(6,8,20,0.86)';
+  roundRect(ctx, lx, ly, legendW, legendH, 7);
+  ctx.fill();
+
+  ctx.lineWidth = 0.9;
+  ctx.strokeStyle = 'rgba(240,192,64,0.25)';
+  roundRect(ctx, lx, ly, legendW, legendH, 7);
+  ctx.stroke();
+
+  ctx.font = 'bold 9px sans-serif';
+  ctx.fillStyle = 'rgba(240,192,64,0.82)';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('🏆 국력 순위', lx + 8, ly + 5);
+
+  var maxTotal = Math.max(1, sorted[0].scores ? sorted[0].scores.total : 1);
+  sorted.forEach(function(p, idx) {
+    var ry = ly + 17 + idx * 17;
+    var total = p.scores ? p.scores.total : 0;
+
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    ctx.fillRect(lx + 8, ry + 4, legendW - 16, 9);
+
+    var barW = Math.max(4, (legendW - 16) * (total / maxTotal));
+    ctx.fillStyle = rgbaFromHex(p.color || '#f0c040', 0.70);
+    ctx.fillRect(lx + 8, ry + 4, barW, 9);
+
+    ctx.font = '8px sans-serif';
+    ctx.fillStyle = '#e8dfc8';
+    ctx.textAlign = 'left';
+    var label = (idx + 1) + '. ' + (p.emoji || '👑') + ' ' + ((p.name || '플레이어').length > 5 ? (p.name || '플레이어').slice(0,5) + '…' : (p.name || '플레이어'));
+    ctx.fillText(label, lx + 10, ry + 4);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#f0c040';
+    ctx.fillText(total, lx + legendW - 6, ry + 4);
+  });
+
+  ctx.restore();
+}
+
+function drawTileLegend(ctx, x, y) {
+  var items = [
+    { code:'p', label:'초원' }, { code:'f', label:'숲' }, { code:'d', label:'사막' },
+    { code:'m', label:'산' }, { code:'t', label:'설원' }, { code:'j', label:'열대' }
+  ];
+
+  ctx.save();
+  var boxW = 178;
+  var boxH = 64;
+  ctx.fillStyle = 'rgba(6,8,20,0.74)';
+  roundRect(ctx, x, y, boxW, boxH, 7);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.stroke();
+
+  ctx.font = 'bold 9px sans-serif';
+  ctx.fillStyle = 'rgba(246,231,181,0.85)';
+  ctx.textAlign = 'left';
+  ctx.fillText('타일 지형', x + 8, y + 6);
+
+  items.forEach(function(item, idx) {
+    var tile = TILE_TYPES[item.code];
+    var ix = x + 10 + (idx % 3) * 55;
+    var iy = y + 24 + Math.floor(idx / 3) * 18;
+    ctx.fillStyle = tile.color;
+    ctx.fillRect(ix, iy, 11, 11);
+    ctx.strokeStyle = tile.edge;
+    ctx.strokeRect(ix, iy, 11, 11);
+    ctx.font = '8px sans-serif';
+    ctx.fillStyle = '#dfe8f2';
+    ctx.fillText(item.label, ix + 15, iy + 1);
+  });
+  ctx.restore();
+}
+
+/* ─── 외부 호출용: 기존 함수명 유지 ──────────────── */
+var _mapDrawScheduled = false;
+var _mapLastPlayers = null;
+var _mapLastCurId = null;
+var _mapAnimFrame = null;
+
+function scheduleMapDraw(players, currentPlayerId) {
+  _mapLastPlayers = players || [];
+  _mapLastCurId = currentPlayerId;
+
+  if (_mapDrawScheduled) return;
+  _mapDrawScheduled = true;
+
+  setTimeout(function() {
+    _mapDrawScheduled = false;
+    var canvas = document.getElementById('worldMap');
+    if (!canvas) return;
+
+    drawWorldMap(canvas, _mapLastPlayers, _mapLastCurId);
+
+    /* 현재 플레이어 강조 링이 살아 보이도록 가벼운 애니메이션 */
+    if (_mapAnimFrame) cancelAnimationFrame(_mapAnimFrame);
+    function animate() {
+      var c = document.getElementById('worldMap');
+      if (!c) return;
+      drawWorldMap(c, _mapLastPlayers, _mapLastCurId);
+      _mapAnimFrame = requestAnimationFrame(animate);
+    }
+    _mapAnimFrame = requestAnimationFrame(animate);
+  }, 0);
 }
