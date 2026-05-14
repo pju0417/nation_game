@@ -351,9 +351,78 @@ function ensureButtonMapStyles() {
 
     '.hex-map-footer{display:flex;justify-content:space-between;gap:10px;padding:9px 14px 12px;font-size:11px;color:rgba(210,225,245,.62);background:rgba(4,6,15,.38);}' +
 
+     '.hex-building-mark{' +
+  'position:absolute;' +
+  'left:50%;' +
+  'bottom:10px;' +
+  'transform:translateX(-50%);' +
+  'width:24px;' +
+  'height:24px;' +
+  'border-radius:50%;' +
+  'background:rgba(6,8,20,.88);' +
+  'border:2px solid rgba(240,192,64,.85);' +
+  'display:flex;' +
+  'align-items:center;' +
+  'justify-content:center;' +
+  'font-size:14px;' +
+  'z-index:5;' +
+  'pointer-events:none;' +
+'}' +
+
     '@media (max-width:768px){.hex-map-scroll{padding:12px;}.hex-map-header{align-items:flex-start;flex-direction:column;}.hex-map-badges{justify-content:flex-start;}}';
 
   document.head.appendChild(style);
+}
+
+/* ─── 타일 건설 저장소 ───────────────────────────── */
+
+function ensureTileBuildingStore() {
+  if (typeof G === 'undefined') return;
+  if (!G.mapBuildings) G.mapBuildings = {};
+}
+
+function getTileBuildingId(row, col) {
+  ensureTileBuildingStore();
+  if (typeof G === 'undefined' || !G.mapBuildings) return null;
+  return G.mapBuildings[tileKey(row, col)] || null;
+}
+
+function getSelectedBuildTile() {
+  if (typeof G === 'undefined') return null;
+  if (!G.selBuildTile) return null;
+  return getTile(G.selBuildTile.row, G.selBuildTile.col);
+}
+
+function canPlaceBuildingOnTile(player, buildingId, tilePos) {
+  if (!player || !buildingId || !tilePos) return false;
+
+  var tile = getTile(tilePos.row, tilePos.col);
+  if (!tile) return false;
+
+  if (!tile.buildable) return false;
+  if (tile.type === 'o' || tile.type === 'm') return false;
+  if (tile.ownerPlayerId !== player.id) return false;
+  if (tile.buildingId) return false;
+
+  return true;
+}
+
+function placeBuildingOnSelectedTile(player, buildingId, tilePos) {
+  ensureTileBuildingStore();
+
+  if (!canPlaceBuildingOnTile(player, buildingId, tilePos)) {
+    return false;
+  }
+
+  var key = tileKey(tilePos.row, tilePos.col);
+  G.mapBuildings[key] = buildingId;
+
+  var tile = getTile(tilePos.row, tilePos.col);
+  if (tile) {
+    tile.buildingId = buildingId;
+  }
+
+  return true;
 }
 
 /* ─── 타일 데이터 생성 ───────────────────────────── */
@@ -385,7 +454,7 @@ function buildMapTiles(force) {
         ownerClimate:null,
         ownerPlayerId:null,
         ownerDistance:null,
-        buildingId:null,
+        buildingId:getTileBuildingId(row, col),
         unitId:null,
         isCapital:false,
         capitalClimate:null,
@@ -701,6 +770,9 @@ function renderTileButton(tile, players, currentPlayerId) {
 
   html += '<span class="hex-icon">' + tileType.icon + '</span>';
   html += '<span class="hex-yield">' + getYieldIcon(tile) + '</span>';
+ if (tile.buildingId) {
+  html += '<span class="hex-building-mark">' + getBuildingEmojiById(tile.buildingId) + '</span>';
+}
 
   /*
     수도 아이콘은 실제 참여 중인 국가의 자기 수도에만 표시.
@@ -804,6 +876,13 @@ function selectTile(tile) {
 
   tile.selected = true;
   SELECTED_TILE = tile;
+
+  if (typeof G !== 'undefined') {
+    G.selBuildTile = {
+      row: tile.row,
+      col: tile.col
+    };
+  }
 
   renderButtonHexMap(_mapLastPlayers || [], _mapLastCurId);
   showTileInfo(tile, _mapLastPlayers || []);
