@@ -3,12 +3,6 @@
    버튼식 문명형 육각 타일 지도 전용 버전
    made by 박선생
 
-   적용 방법:
-   - GitHub 저장소에서 js/map.js 파일을 연다.
-   - 기존 내용을 전부 삭제한다.
-   - 이 코드 전체를 붙여넣는다.
-   - Commit changes 한다.
-
    핵심 기능:
    1. Canvas를 사용하지 않음
    2. 기존 <canvas id="worldMap">가 있으면 자동으로 제거
@@ -17,8 +11,8 @@
    5. 타일 하나하나가 클릭 가능한 개체
    6. MAP_TILES 데이터와 버튼이 직접 연결됨
    7. G.maxTurns 값에 따라 지도 규모 변경
-   8. 국가별 영토 색상과 테두리 강화
-   9. 타일 선택 시 정보창 표시
+   8. 인구가 늘어날수록 영토가 점차 확장됨
+   9. 영토는 타일색으로 칠하지 않고 선으로만 구분
    10. 기존 scheduleMapDraw(players, currentPlayerId) 함수명 유지
 ========================================================= */
 
@@ -43,87 +37,23 @@ var CLIMATE_ORDER = ['cold', 'highland', 'temperate', 'arid', 'monsoon', 'tropic
 
 /* ─── 타일 지형 정의 ─────────────────────────────── */
 var TILE_TYPES = {
-  o: {
-    id: 'ocean',
-    name: '바다',
-    color: '#12395f',
-    edge: '#1e5a88',
-    icon: '≈',
-    yield: { gold: 1 },
-    buildable: false
-  },
-  t: {
-    id: 'tundra',
-    name: '설원',
-    color: '#9fc7d7',
-    edge: '#d4eef8',
-    icon: '❄',
-    yield: { science: 1, production: 1 },
-    buildable: true
-  },
-  p: {
-    id: 'plains',
-    name: '초원',
-    color: '#3f8d3d',
-    edge: '#66c466',
-    icon: '·',
-    yield: { food: 2 },
-    buildable: true
-  },
-  f: {
-    id: 'forest',
-    name: '숲',
-    color: '#1f6436',
-    edge: '#3fa05a',
-    icon: '♣',
-    yield: { food: 1, production: 1 },
-    buildable: true
-  },
-  d: {
-    id: 'desert',
-    name: '사막',
-    color: '#b88932',
-    edge: '#e4c15d',
-    icon: '·',
-    yield: { gold: 2 },
-    buildable: true
-  },
-  m: {
-    id: 'mountain',
-    name: '산악',
-    color: '#666a74',
-    edge: '#b8bdc8',
-    icon: '▲',
-    yield: { production: 2, science: 1 },
-    buildable: false
-  },
-  j: {
-    id: 'jungle',
-    name: '열대우림',
-    color: '#157a3a',
-    edge: '#35b85d',
-    icon: '🌿',
-    yield: { food: 2, culture: 1 },
-    buildable: true
-  },
-  h: {
-    id: 'highland',
-    name: '고원',
-    color: '#555372',
-    edge: '#b0b0d8',
-    icon: '▲',
-    yield: { science: 2 },
-    buildable: true
-  }
+  o: { id:'ocean',    name:'바다',     color:'#12395f', edge:'#1e5a88', icon:'≈',  yield:{ gold:1 }, buildable:false },
+  t: { id:'tundra',   name:'설원',     color:'#9fc7d7', edge:'#d4eef8', icon:'❄', yield:{ science:1, production:1 }, buildable:true },
+  p: { id:'plains',   name:'초원',     color:'#3f8d3d', edge:'#66c466', icon:'·',  yield:{ food:2 }, buildable:true },
+  f: { id:'forest',   name:'숲',       color:'#1f6436', edge:'#3fa05a', icon:'♣',  yield:{ food:1, production:1 }, buildable:true },
+  d: { id:'desert',   name:'사막',     color:'#b88932', edge:'#e4c15d', icon:'·',  yield:{ gold:2 }, buildable:true },
+  m: { id:'mountain', name:'산악',     color:'#666a74', edge:'#b8bdc8', icon:'▲', yield:{ production:2, science:1 }, buildable:false },
+  j: { id:'jungle',   name:'열대우림', color:'#157a3a', edge:'#35b85d', icon:'🌿', yield:{ food:2, culture:1 }, buildable:true },
+  h: { id:'highland', name:'고원',     color:'#555372', edge:'#b0b0d8', icon:'▲', yield:{ science:2 }, buildable:true }
 };
 
 /* ─── 턴 수별 지도 프로필 ───────────────────────── */
 var MAP_PROFILES = {
   short: {
-    key: 'short',
-    label: '확장형 소형 지도',
-    turnLabel: '15턴',
-    map: [
+    key:'short',
+    label:'확장형 소형 지도',
+    turnLabel:'15턴',
+    map:[
       ['o','o','t','t','t','m','m','h','h','o','o','o','o'],
       ['o','t','t','p','p','m','h','h','p','p','o','o','o'],
       ['o','t','p','p','f','m','d','d','p','f','f','o','o'],
@@ -133,21 +63,21 @@ var MAP_PROFILES = {
       ['o','o','o','j','j','p','f','f','j','j','o','o','o'],
       ['o','o','o','o','j','j','f','p','p','o','o','o','o']
     ],
-    starts: {
-      cold:      { row: 1, col: 2 },
-      highland:  { row: 1, col: 7 },
-      temperate: { row: 3, col: 2 },
-      arid:      { row: 3, col: 5 },
-      monsoon:   { row: 3, col: 9 },
-      tropical:  { row: 6, col: 4 }
+    starts:{
+      cold:{row:1,col:2},
+      highland:{row:1,col:7},
+      temperate:{row:3,col:2},
+      arid:{row:3,col:5},
+      monsoon:{row:3,col:9},
+      tropical:{row:6,col:4}
     }
   },
 
   standard: {
-    key: 'standard',
-    label: '대형 표준 지도',
-    turnLabel: '20턴',
-    map: [
+    key:'standard',
+    label:'대형 표준 지도',
+    turnLabel:'20턴',
+    map:[
       ['o','o','t','t','t','t','m','m','h','h','h','o','o','o','o'],
       ['o','t','t','t','p','p','m','h','h','p','p','p','o','o','o'],
       ['o','t','p','p','p','f','m','d','d','p','p','f','f','o','o'],
@@ -159,21 +89,21 @@ var MAP_PROFILES = {
       ['o','o','o','o','o','j','j','f','f','p','p','o','o','o','o'],
       ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
     ],
-    starts: {
-      cold:      { row: 1, col: 2 },
-      highland:  { row: 1, col: 8 },
-      temperate: { row: 3, col: 2 },
-      arid:      { row: 3, col: 7 },
-      monsoon:   { row: 3, col: 12 },
-      tropical:  { row: 7, col: 5 }
+    starts:{
+      cold:{row:1,col:2},
+      highland:{row:1,col:8},
+      temperate:{row:3,col:2},
+      arid:{row:3,col:7},
+      monsoon:{row:3,col:12},
+      tropical:{row:7,col:5}
     }
   },
 
   long: {
-    key: 'long',
-    label: '초대형 장기 지도',
-    turnLabel: '30턴',
-    map: [
+    key:'long',
+    label:'초대형 장기 지도',
+    turnLabel:'30턴',
+    map:[
       ['o','o','o','t','t','t','t','m','m','h','h','h','h','o','o','o','o'],
       ['o','o','t','t','t','p','p','m','m','h','h','p','p','p','o','o','o'],
       ['o','t','t','p','p','p','f','m','d','d','p','p','f','f','o','o','o'],
@@ -187,13 +117,13 @@ var MAP_PROFILES = {
       ['o','o','o','o','o','o','j','j','f','f','p','o','o','o','o','o','o'],
       ['o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o','o']
     ],
-    starts: {
-      cold:      { row: 1, col: 3 },
-      highland:  { row: 1, col: 10 },
-      temperate: { row: 4, col: 2 },
-      arid:      { row: 4, col: 8 },
-      monsoon:   { row: 4, col: 14 },
-      tropical:  { row: 8, col: 6 }
+    starts:{
+      cold:{row:1,col:3},
+      highland:{row:1,col:10},
+      temperate:{row:4,col:2},
+      arid:{row:4,col:8},
+      monsoon:{row:4,col:14},
+      tropical:{row:8,col:6}
     }
   }
 };
@@ -208,15 +138,12 @@ function getTile(row, col) {
 }
 
 function getMaxTurnsForMap() {
-  if (typeof G !== 'undefined' && G && G.maxTurns) {
-    return parseInt(G.maxTurns, 10);
-  }
+  if (typeof G !== 'undefined' && G && G.maxTurns) return parseInt(G.maxTurns, 10);
   return 20;
 }
 
 function getMapProfile() {
   var turns = getMaxTurnsForMap();
-
   if (turns <= 15) return MAP_PROFILES.short;
   if (turns >= 30) return MAP_PROFILES.long;
   return MAP_PROFILES.standard;
@@ -228,54 +155,39 @@ function getClimateStart(climateId) {
 }
 
 function getClimateName(climateId) {
-  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) {
-    return CLIMATES[climateId].name;
-  }
+  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) return CLIMATES[climateId].name;
   return climateId || '없음';
 }
 
 function getClimateEmoji(climateId) {
-  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) {
-    return CLIMATES[climateId].emoji;
-  }
+  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) return CLIMATES[climateId].emoji;
   return '🏛️';
 }
 
 function getPlayerColor(player, climateId) {
   if (player && player.color) return player.color;
-
-  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) {
-    return CLIMATES[climateId].color;
-  }
-
+  if (typeof CLIMATES !== 'undefined' && CLIMATES[climateId]) return CLIMATES[climateId].color;
   return '#f0c040';
 }
 
 function getPlayerById(players, id) {
   if (!players || id === null || typeof id === 'undefined') return null;
-
   for (var i = 0; i < players.length; i++) {
     if (players[i].id === id) return players[i];
   }
-
   return null;
 }
 
 function getPlayerByClimate(players, climateId) {
   if (!players) return null;
-
   for (var i = 0; i < players.length; i++) {
     if (players[i].climate === climateId) return players[i];
   }
-
   return null;
 }
 
 function hexToRgb(hex) {
-  if (!hex || typeof hex !== 'string' || hex.charAt(0) !== '#') {
-    return [255, 255, 255];
-  }
-
+  if (!hex || typeof hex !== 'string' || hex.charAt(0) !== '#') return [255, 255, 255];
   return [
     parseInt(hex.slice(1, 3), 16),
     parseInt(hex.slice(3, 5), 16),
@@ -292,19 +204,17 @@ function formatYield(yieldObj) {
   if (!yieldObj) return '없음';
 
   var labels = {
-    food: '🌾 식량',
-    production: '⚙️ 생산력',
-    gold: '💰 금화',
-    science: '🔬 과학',
-    culture: '🎨 문화'
+    food:'🌾 식량',
+    production:'⚙️ 생산력',
+    gold:'💰 금화',
+    science:'🔬 과학',
+    culture:'🎨 문화'
   };
 
   var result = [];
 
   Object.keys(yieldObj).forEach(function(key) {
-    if (yieldObj[key]) {
-      result.push(labels[key] + ' +' + yieldObj[key]);
-    }
+    if (yieldObj[key]) result.push(labels[key] + ' +' + yieldObj[key]);
   });
 
   return result.length ? result.join(', ') : '없음';
@@ -312,7 +222,6 @@ function formatYield(yieldObj) {
 
 function safeText(value) {
   if (value === null || typeof value === 'undefined') return '';
-
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -329,240 +238,84 @@ function ensureButtonMapStyles() {
 
   style.textContent =
     '.hex-map-shell{' +
-      'width:100%;' +
-      'max-width:1680px;' +
-      'margin:0 auto;' +
-      'border-radius:14px;' +
+      'width:100%;max-width:1740px;margin:0 auto;border-radius:16px;' +
       'border:1px solid rgba(240,192,64,.22);' +
       'background:linear-gradient(135deg,#04101e,#071a2f 45%,#10243a);' +
-      'box-shadow:0 16px 36px rgba(0,0,0,.28);' +
-      'overflow:hidden;' +
+      'box-shadow:0 18px 40px rgba(0,0,0,.30);overflow:hidden;' +
     '}' +
 
     '.hex-map-header{' +
-      'display:flex;' +
-      'justify-content:space-between;' +
-      'align-items:center;' +
-      'gap:12px;' +
-      'padding:10px 14px;' +
-      'border-bottom:1px solid rgba(255,255,255,.08);' +
+      'display:flex;justify-content:space-between;align-items:center;gap:12px;' +
+      'padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);' +
       'background:rgba(4,6,15,.62);' +
     '}' +
 
-    '.hex-map-title{' +
-      'font-weight:900;' +
-      'color:#f6e7b5;' +
-      'font-size:15px;' +
-    '}' +
+    '.hex-map-title{font-weight:900;color:#f6e7b5;font-size:15px;}' +
+    '.hex-map-subtitle{font-size:11px;color:rgba(210,225,245,.66);margin-top:2px;}' +
+    '.hex-map-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}' +
+    '.hex-map-badge{font-size:11px;color:#f6e7b5;background:rgba(240,192,64,.10);border:1px solid rgba(240,192,64,.22);border-radius:999px;padding:4px 8px;white-space:nowrap;}' +
 
-    '.hex-map-subtitle{' +
-      'font-size:11px;' +
-      'color:rgba(210,225,245,.66);' +
-      'margin-top:2px;' +
-    '}' +
-
-    '.hex-map-badges{' +
-      'display:flex;' +
-      'gap:6px;' +
-      'flex-wrap:wrap;' +
-      'justify-content:flex-end;' +
-    '}' +
-
-    '.hex-map-badge{' +
-      'font-size:11px;' +
-      'color:#f6e7b5;' +
-      'background:rgba(240,192,64,.10);' +
-      'border:1px solid rgba(240,192,64,.22);' +
-      'border-radius:999px;' +
-      'padding:4px 8px;' +
-      'white-space:nowrap;' +
-    '}' +
-
-    '.hex-map-scroll{' +
-      'width:100%;' +
-      'overflow:auto;' +
-      'padding:18px;' +
-      'box-sizing:border-box;' +
-    '}' +
+    '.hex-map-scroll{width:100%;overflow:auto;padding:18px;box-sizing:border-box;}' +
 
     '.hex-map-board{' +
-      'position:relative;' +
-      'margin:0 auto;' +
-      'background:' +
-        'radial-gradient(circle at 20% 20%,rgba(120,180,255,.08),transparent 28%),' +
-        'radial-gradient(circle at 75% 65%,rgba(240,192,64,.07),transparent 30%),' +
-        'rgba(4,8,18,.32);' +
-      'border-radius:16px;' +
-      'min-width:max-content;' +
+      'position:relative;margin:0 auto;' +
+      'background:radial-gradient(circle at 20% 20%,rgba(120,180,255,.08),transparent 28%),radial-gradient(circle at 75% 65%,rgba(240,192,64,.07),transparent 30%),rgba(4,8,18,.32);' +
+      'border-radius:16px;min-width:max-content;' +
     '}' +
 
     '.hex-tile-btn{' +
-      'position:absolute;' +
-      'width:72px;' +
-      'height:82px;' +
-      'border:0;' +
-      'padding:0;' +
-      'margin:0;' +
-      'cursor:pointer;' +
+      'position:absolute;width:72px;height:82px;border:0;padding:0;margin:0;cursor:pointer;' +
       'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
       'background:var(--tile-color);' +
-      'box-shadow:' +
-        'inset 0 0 0 2px rgba(255,255,255,.16),' +
-        'inset 0 -16px 22px rgba(0,0,0,.22),' +
-        'inset 0 10px 16px rgba(255,255,255,.12);' +
+      'box-shadow:inset 0 0 0 2px rgba(255,255,255,.16),inset 0 -16px 22px rgba(0,0,0,.22),inset 0 10px 16px rgba(255,255,255,.12);' +
       'transition:transform .08s ease, filter .08s ease, box-shadow .08s ease;' +
-      'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;' +
-      'user-select:none;' +
+      'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:none;' +
     '}' +
 
-    '.hex-tile-btn:hover{' +
-      'transform:translateY(-2px) scale(1.035);' +
-      'filter:brightness(1.12);' +
-      'z-index:40!important;' +
-    '}' +
-
-    '.hex-tile-btn:focus-visible{' +
-      'outline:3px solid #f0c040;' +
-      'outline-offset:2px;' +
-      'z-index:45!important;' +
-    '}' +
+    '.hex-tile-btn:hover{transform:translateY(-2px) scale(1.035);filter:brightness(1.12);z-index:40!important;}' +
+    '.hex-tile-btn:focus-visible{outline:3px solid #f0c040;outline-offset:2px;z-index:45!important;}' +
 
     '.hex-tile-btn.owned{' +
-      'background:' +
-        'linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,0) 46%,rgba(0,0,0,.20)),' +
-        'linear-gradient(135deg,var(--owner-soft),var(--owner-strong)),' +
-        'var(--tile-color);' +
-      'box-shadow:' +
-        '0 0 0 4px var(--owner-strong),' +
-        '0 0 0 7px rgba(255,255,255,.30),' +
-        '0 0 16px var(--owner-soft),' +
-        'inset 0 0 0 2px rgba(255,255,255,.20),' +
-        'inset 0 -16px 22px rgba(0,0,0,.24);' +
+      'background:var(--tile-color);' +
+      'box-shadow:0 0 0 4px var(--owner-strong),0 0 0 7px rgba(255,255,255,.28),0 0 16px var(--owner-soft),inset 0 0 0 2px rgba(255,255,255,.18),inset 0 -16px 22px rgba(0,0,0,.22);' +
       'z-index:10;' +
     '}' +
 
     '.hex-tile-btn.capital{' +
-      'box-shadow:' +
-        '0 0 0 5px var(--owner-strong),' +
-        '0 0 0 9px rgba(240,192,64,.72),' +
-        '0 0 22px var(--owner-strong),' +
-        'inset 0 0 0 2px rgba(255,255,255,.24),' +
-        'inset 0 -16px 22px rgba(0,0,0,.24);' +
+      'box-shadow:0 0 0 5px var(--owner-strong),0 0 0 9px rgba(240,192,64,.72),0 0 22px var(--owner-strong),inset 0 0 0 2px rgba(255,255,255,.24),inset 0 -16px 22px rgba(0,0,0,.24);' +
       'z-index:22;' +
     '}' +
 
-    '.hex-tile-btn.current-capital{' +
-      'animation:hexPulse 1.4s ease-in-out infinite;' +
-    '}' +
+    '.hex-tile-btn.current-capital{animation:hexPulse 1.4s ease-in-out infinite;}' +
 
     '.hex-tile-btn.selected{' +
-      'box-shadow:' +
-        '0 0 0 5px #f0c040,' +
-        '0 0 0 9px rgba(255,255,255,.62),' +
-        '0 0 24px rgba(240,192,64,.80),' +
-        'inset 0 0 0 2px rgba(255,255,255,.30),' +
-        'inset 0 -16px 22px rgba(0,0,0,.24);' +
-      'z-index:60!important;' +
-      'filter:brightness(1.16);' +
+      'box-shadow:0 0 0 5px #f0c040,0 0 0 9px rgba(255,255,255,.62),0 0 24px rgba(240,192,64,.80),inset 0 0 0 2px rgba(255,255,255,.30),inset 0 -16px 22px rgba(0,0,0,.24);' +
+      'z-index:60!important;filter:brightness(1.16);' +
     '}' +
 
-    '@keyframes hexPulse{' +
-      '0%,100%{filter:brightness(1);}' +
-      '50%{filter:brightness(1.28);}' +
-    '}' +
+    '@keyframes hexPulse{0%,100%{filter:brightness(1);}50%{filter:brightness(1.28);}}' +
 
-    '.hex-icon{' +
-      'position:absolute;' +
-      'left:0;' +
-      'right:0;' +
-      'top:21px;' +
-      'text-align:center;' +
-      'font-size:18px;' +
-      'line-height:1;' +
-      'color:rgba(255,255,255,.88);' +
-      'text-shadow:0 1px 3px rgba(0,0,0,.55);' +
-      'pointer-events:none;' +
-    '}' +
-
-    '.hex-yield{' +
-      'position:absolute;' +
-      'right:15px;' +
-      'bottom:17px;' +
-      'font-size:12px;' +
-      'line-height:1;' +
-      'opacity:.82;' +
-      'filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));' +
-      'pointer-events:none;' +
-    '}' +
+    '.hex-icon{position:absolute;left:0;right:0;top:21px;text-align:center;font-size:18px;line-height:1;color:rgba(255,255,255,.88);text-shadow:0 1px 3px rgba(0,0,0,.55);pointer-events:none;}' +
+    '.hex-yield{position:absolute;right:15px;bottom:17px;font-size:12px;line-height:1;opacity:.82;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));pointer-events:none;}' +
 
     '.hex-owner-mark{' +
-      'position:absolute;' +
-      'left:50%;' +
-      'top:50%;' +
-      'transform:translate(-50%,-50%);' +
-      'width:24px;' +
-      'height:24px;' +
-      'border-radius:50%;' +
-      'background:rgba(6,8,20,.88);' +
-      'display:flex;' +
-      'align-items:center;' +
-      'justify-content:center;' +
-      'font-size:14px;' +
-      'border:2px solid var(--owner-strong);' +
-      'box-shadow:0 0 12px var(--owner-soft);' +
-      'pointer-events:none;' +
+      'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;' +
+      'background:rgba(6,8,20,.88);display:flex;align-items:center;justify-content:center;font-size:14px;' +
+      'border:2px solid var(--owner-strong);box-shadow:0 0 12px var(--owner-soft);pointer-events:none;' +
     '}' +
 
     '.hex-country-label{' +
-      'position:absolute;' +
-      'z-index:55;' +
-      'transform:translate(-50%,-50%);' +
-      'padding:4px 9px;' +
-      'border-radius:999px;' +
-      'background:rgba(6,8,20,.78);' +
-      'border:1px solid var(--owner-strong);' +
-      'color:#f6e7b5;' +
-      'font-size:12px;' +
-      'font-weight:800;' +
-      'white-space:nowrap;' +
-      'pointer-events:none;' +
-      'box-shadow:0 4px 12px rgba(0,0,0,.28);' +
-      'text-shadow:0 1px 2px rgba(0,0,0,.7);' +
+      'position:absolute;z-index:55;transform:translate(-50%,-50%);padding:4px 9px;border-radius:999px;' +
+      'background:rgba(6,8,20,.80);border:1px solid var(--owner-strong);color:#f6e7b5;font-size:12px;font-weight:800;white-space:nowrap;pointer-events:none;' +
+      'box-shadow:0 4px 12px rgba(0,0,0,.28);text-shadow:0 1px 2px rgba(0,0,0,.7);' +
     '}' +
 
-    '.hex-info-box{' +
-      'margin-top:10px;' +
-      'padding:12px 14px;' +
-      'border:1px solid rgba(255,255,255,.20);' +
-      'border-radius:12px;' +
-      'background:rgba(8,9,26,.92);' +
-      'color:#f6e7b5;' +
-      'font-size:13px;' +
-      'line-height:1.55;' +
-      'box-shadow:0 10px 24px rgba(0,0,0,.25);' +
-    '}' +
+    '.hex-info-box{margin-top:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.20);border-radius:12px;background:rgba(8,9,26,.92);color:#f6e7b5;font-size:13px;line-height:1.55;box-shadow:0 10px 24px rgba(0,0,0,.25);}' +
+    '.hex-info-title{font-weight:800;font-size:15px;margin-bottom:6px;}' +
 
-    '.hex-info-title{' +
-      'font-weight:800;' +
-      'font-size:15px;' +
-      'margin-bottom:6px;' +
-    '}' +
+    '.hex-map-footer{display:flex;justify-content:space-between;gap:10px;padding:9px 14px 12px;font-size:11px;color:rgba(210,225,245,.62);background:rgba(4,6,15,.38);}' +
 
-    '.hex-map-footer{' +
-      'display:flex;' +
-      'justify-content:space-between;' +
-      'gap:10px;' +
-      'padding:9px 14px 12px;' +
-      'font-size:11px;' +
-      'color:rgba(210,225,245,.62);' +
-      'background:rgba(4,6,15,.38);' +
-    '}' +
-
-    '@media (max-width:768px){' +
-      '.hex-map-scroll{padding:12px;}' +
-      '.hex-map-header{align-items:flex-start;flex-direction:column;}' +
-      '.hex-map-badges{justify-content:flex-start;}' +
-    '}';
+    '@media (max-width:768px){.hex-map-scroll{padding:12px;}.hex-map-header{align-items:flex-start;flex-direction:column;}.hex-map-badges{justify-content:flex-start;}}';
 
   document.head.appendChild(style);
 }
@@ -571,9 +324,7 @@ function ensureButtonMapStyles() {
 function buildMapTiles(force) {
   var profile = getMapProfile();
 
-  if (!force && CURRENT_MAP_KEY === profile.key && MAP_TILES.length > 0) {
-    return;
-  }
+  if (!force && CURRENT_MAP_KEY === profile.key && MAP_TILES.length > 0) return;
 
   CURRENT_MAP_PROFILE = profile;
   CURRENT_MAP_KEY = profile.key;
@@ -589,22 +340,23 @@ function buildMapTiles(force) {
       var typeDef = TILE_TYPES[typeCode] || TILE_TYPES.p;
 
       var tile = {
-        id: tileKey(row, col),
-        row: row,
-        col: col,
-        type: typeCode,
-        typeId: typeDef.id,
-        typeName: typeDef.name,
-        ownerClimate: null,
-        ownerPlayerId: null,
-        buildingId: null,
-        unitId: null,
-        isCapital: false,
-        capitalClimate: null,
-        discovered: true,
-        selected: false,
-        yield: Object.assign({}, typeDef.yield || {}),
-        buildable: !!typeDef.buildable
+        id:tileKey(row, col),
+        row:row,
+        col:col,
+        type:typeCode,
+        typeId:typeDef.id,
+        typeName:typeDef.name,
+        ownerClimate:null,
+        ownerPlayerId:null,
+        ownerDistance:null,
+        buildingId:null,
+        unitId:null,
+        isCapital:false,
+        capitalClimate:null,
+        discovered:true,
+        selected:false,
+        yield:Object.assign({}, typeDef.yield || {}),
+        buildable:!!typeDef.buildable
       };
 
       MAP_TILES.push(tile);
@@ -630,7 +382,6 @@ function markCapitalTiles() {
     if (!pos) return;
 
     var tile = getTile(pos.row, pos.col);
-
     if (tile) {
       tile.isCapital = true;
       tile.capitalClimate = climateId;
@@ -643,47 +394,64 @@ function offsetToCube(row, col) {
   var x = col - (row - (row & 1)) / 2;
   var z = row;
   var y = -x - z;
-
-  return { x: x, y: y, z: z };
+  return { x:x, y:y, z:z };
 }
 
 function getHexDistance(a, b) {
   var ac = offsetToCube(a.row, a.col);
   var bc = offsetToCube(b.row, b.col);
-
-  return Math.max(
-    Math.abs(ac.x - bc.x),
-    Math.abs(ac.y - bc.y),
-    Math.abs(ac.z - bc.z)
-  );
+  return Math.max(Math.abs(ac.x - bc.x), Math.abs(ac.y - bc.y), Math.abs(ac.z - bc.z));
 }
 
-function getTerritoryRadiusByTurns() {
+function getBaseTerritoryRadiusByTurns() {
   var turns = getMaxTurnsForMap();
-
-  if (turns <= 15) return 2;
-  if (turns >= 30) return 3;
-  return 2;
+  if (turns <= 15) return 1;
+  if (turns >= 30) return 2;
+  return 1;
 }
 
-function getClimateTerritory(climateId) {
-  var start = getClimateStart(climateId);
-  if (!start) return [];
+function getTerritoryRadiusForPlayer(player) {
+  var pop = player && player.population ? parseInt(player.population, 10) : 3;
+  var base = getBaseTerritoryRadiusByTurns();
+  var bonus = 0;
 
-  var radius = getTerritoryRadiusByTurns();
-  var result = [];
+  if (pop >= 5) bonus += 1;
+  if (pop >= 9) bonus += 1;
+  if (pop >= 14) bonus += 1;
+  if (pop >= 20) bonus += 1;
 
-  MAP_TILES.forEach(function(tile) {
-    if (tile.type === 'o') return;
+  var turns = getMaxTurnsForMap();
+  var maxRadius = turns >= 30 ? 5 : 4;
 
-    var dist = getHexDistance(start, tile);
+  return Math.min(maxRadius, base + bonus);
+}
 
-    if (dist <= radius) {
-      result.push({ row: tile.row, col: tile.col });
-    }
-  });
+function claimTileForPlayer(tile, player, dist) {
+  if (!tile || tile.type === 'o' || !player) return;
 
-  return result;
+  if (tile.ownerPlayerId === null || typeof tile.ownerPlayerId === 'undefined') {
+    tile.ownerClimate = player.climate;
+    tile.ownerPlayerId = player.id;
+    tile.ownerDistance = dist;
+    return;
+  }
+
+  var currentOwner = getPlayerById(_mapLastPlayers, tile.ownerPlayerId);
+  var currentPop = currentOwner && currentOwner.population ? currentOwner.population : 0;
+  var nextPop = player.population || 0;
+
+  if (dist < tile.ownerDistance) {
+    tile.ownerClimate = player.climate;
+    tile.ownerPlayerId = player.id;
+    tile.ownerDistance = dist;
+    return;
+  }
+
+  if (dist === tile.ownerDistance && nextPop > currentPop) {
+    tile.ownerClimate = player.climate;
+    tile.ownerPlayerId = player.id;
+    tile.ownerDistance = dist;
+  }
 }
 
 /* ─── 플레이어 데이터와 타일 연결 ───────────────── */
@@ -693,6 +461,7 @@ function syncTilesWithPlayers(players) {
   MAP_TILES.forEach(function(tile) {
     tile.ownerClimate = null;
     tile.ownerPlayerId = null;
+    tile.ownerDistance = null;
   });
 
   if (!players) return;
@@ -700,14 +469,18 @@ function syncTilesWithPlayers(players) {
   players.forEach(function(player) {
     if (!player || !player.climate) return;
 
-    var territory = getClimateTerritory(player.climate);
+    var start = getClimateStart(player.climate);
+    if (!start) return;
 
-    territory.forEach(function(pos) {
-      var tile = getTile(pos.row, pos.col);
+    var radius = getTerritoryRadiusForPlayer(player);
 
-      if (tile && tile.type !== 'o') {
-        tile.ownerClimate = player.climate;
-        tile.ownerPlayerId = player.id;
+    MAP_TILES.forEach(function(tile) {
+      if (tile.type === 'o') return;
+
+      var dist = getHexDistance(start, tile);
+
+      if (dist <= radius) {
+        claimTileForPlayer(tile, player, dist);
       }
     });
   });
@@ -716,11 +489,9 @@ function syncTilesWithPlayers(players) {
 /* ─── 버튼 지도 전용 host 준비 ──────────────────── */
 function getOrCreateButtonMapHost() {
   var host = document.getElementById('worldMapButtonHost');
-
   if (host) return host;
 
   var canvas = document.getElementById('worldMap');
-
   if (!canvas) return null;
 
   var parent = canvas.parentNode;
@@ -772,12 +543,12 @@ function renderButtonHexMap(players, currentPlayerId) {
   html += '<div class="hex-map-header">';
   html += '<div>';
   html += '<div class="hex-map-title">🗺️ 문명 지도</div>';
-  html += '<div class="hex-map-subtitle">' + profile.turnLabel + ' · ' + profile.label + ' · 버튼식 타일 지도 전용</div>';
+  html += '<div class="hex-map-subtitle">' + profile.turnLabel + ' · ' + profile.label + ' · 인구 성장형 영토</div>';
   html += '</div>';
   html += '<div class="hex-map-badges">';
   html += '<div class="hex-map-badge">타일 ' + MAP_TILES.length + '개</div>';
   html += '<div class="hex-map-badge">영토 ' + ownedCount + '칸</div>';
-  html += '<div class="hex-map-badge">클릭 선택 가능</div>';
+  html += '<div class="hex-map-badge">영토는 선으로 표시</div>';
   html += '</div>';
   html += '</div>';
 
@@ -794,7 +565,7 @@ function renderButtonHexMap(players, currentPlayerId) {
   html += '</div>';
 
   html += '<div class="hex-map-footer">';
-  html += '<div>타일을 클릭하면 아래에 상세 정보가 표시됩니다.</div>';
+  html += '<div>인구 5, 9, 14, 20에 도달하면 영토 반경이 점차 넓어집니다.</div>';
   html += '<div>made by 박선생</div>';
   html += '</div>';
   html += '</div>';
@@ -870,13 +641,11 @@ function renderTileButton(tile, players, currentPlayerId) {
 
 function getYieldIcon(tile) {
   var y = tile.yield || {};
-
   if (y.food) return '🌾';
   if (y.production) return '⚙️';
   if (y.gold) return '💰';
   if (y.science) return '🔬';
   if (y.culture) return '🎨';
-
   return '';
 }
 
@@ -898,7 +667,6 @@ function renderCountryLabels(players) {
     ownedTiles.forEach(function(tile) {
       var left = 30 + tile.col * HEX_X_GAP + (tile.row % 2) * (HEX_X_GAP / 2);
       var top = 24 + tile.row * HEX_Y_GAP;
-
       sumX += left + HEX_W / 2;
       sumY += top + HEX_H / 2;
     });
@@ -909,9 +677,7 @@ function renderCountryLabels(players) {
     var color = getPlayerColor(player, player.climate);
     var label = player.country || player.name || '문명';
 
-    if (label.length > 7) {
-      label = label.slice(0, 7) + '…';
-    }
+    if (label.length > 7) label = label.slice(0, 7) + '…';
 
     html += '<div class="hex-country-label"';
     html += ' style="left:' + cx + 'px;top:' + cy + 'px;--owner-strong:' + color + ';">';
@@ -974,18 +740,22 @@ function showTileInfo(tile, players) {
 
   var buildableText = tile.buildable ? '가능' : '불가';
 
+  var ownerPopText = owner && owner.population
+    ? ' / 인구 ' + owner.population + '명 / 영토 반경 ' + getTerritoryRadiusForPlayer(owner)
+    : '';
+
   box.innerHTML =
     '<div class="hex-info-title">🧭 선택한 타일</div>' +
     '<div>지도 유형: ' + safeText(profile.turnLabel + ' · ' + profile.label) + '</div>' +
     '<div>위치: ' + tile.row + '행 ' + tile.col + '열</div>' +
     '<div>지형: ' + safeText(tileType.icon + ' ' + tileType.name) + '</div>' +
     '<div>생산량: ' + safeText(formatYield(tile.yield)) + '</div>' +
-    '<div>소유자: ' + ownerText + '</div>' +
+    '<div>소유자: ' + ownerText + safeText(ownerPopText) + '</div>' +
     '<div>수도 여부: ' + capitalText + '</div>' +
     '<div>건설 가능: ' + buildableText + '</div>' +
     '<div>건물: ' + safeText(tile.buildingId || '없음') + '</div>' +
     '<div style="margin-top:8px;color:rgba(246,231,181,.68);font-size:12px;">' +
-      '※ 이 타일은 실제 button 요소입니다. 건물 짓기, 유닛 배치, 영토 확장 기능을 쉽게 연결할 수 있습니다.' +
+      '※ 영토는 인구에 따라 확장되며, 타일색은 유지하고 국가별 선으로만 구분됩니다.' +
     '</div>';
 }
 
@@ -993,13 +763,8 @@ function showTileInfo(tile, players) {
 function getBuildingCatalog() {
   var list = [];
 
-  if (typeof BUILDINGS !== 'undefined' && BUILDINGS) {
-    list = list.concat(BUILDINGS);
-  }
-
-  if (typeof UNIQUE_BUILDINGS !== 'undefined' && UNIQUE_BUILDINGS) {
-    list = list.concat(UNIQUE_BUILDINGS);
-  }
+  if (typeof BUILDINGS !== 'undefined' && BUILDINGS) list = list.concat(BUILDINGS);
+  if (typeof UNIQUE_BUILDINGS !== 'undefined' && UNIQUE_BUILDINGS) list = list.concat(UNIQUE_BUILDINGS);
 
   return list;
 }
@@ -1008,30 +773,28 @@ function getBuildingEmojiById(id) {
   var catalog = getBuildingCatalog();
 
   for (var i = 0; i < catalog.length; i++) {
-    if (catalog[i].id === id) {
-      return catalog[i].emoji || '🏗️';
-    }
+    if (catalog[i].id === id) return catalog[i].emoji || '🏗️';
   }
 
   var fallback = {
-    farm: '🌾',
-    aqueduct: '💧',
-    workshop: '🔧',
-    foundry: '🏭',
-    market: '🏪',
-    harbor: '⚓',
-    library: '📚',
-    university: '🎓',
-    temple: '🏛️',
-    theater: '🎭',
-    barracks: '⚔️',
-    fortress: '🏰',
-    rice_terrace: '🌾',
-    caravanserai: '🏕️',
-    windmill: '⚙️',
-    fur_post: '🦊',
-    rice_paddy: '🌿',
-    observatory: '🔭'
+    farm:'🌾',
+    aqueduct:'💧',
+    workshop:'🔧',
+    foundry:'🏭',
+    market:'🏪',
+    harbor:'⚓',
+    library:'📚',
+    university:'🎓',
+    temple:'🏛️',
+    theater:'🎭',
+    barracks:'⚔️',
+    fortress:'🏰',
+    rice_terrace:'🌾',
+    caravanserai:'🏕️',
+    windmill:'⚙️',
+    fur_post:'🦊',
+    rice_paddy:'🌿',
+    observatory:'🔭'
   };
 
   return fallback[id] || '🏗️';
@@ -1041,8 +804,6 @@ function getBuildingEmojiById(id) {
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', function() {
     var host = document.getElementById('worldMapButtonHost');
-    if (host) {
-      renderButtonHexMap(_mapLastPlayers || [], _mapLastCurId);
-    }
+    if (host) renderButtonHexMap(_mapLastPlayers || [], _mapLastCurId);
   });
 }
