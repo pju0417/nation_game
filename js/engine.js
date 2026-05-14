@@ -182,6 +182,11 @@ function processTurn() {
   var log = [];
 
   G.players.forEach(function(p) {
+     var territoryRadiusBefore = null;
+
+if (typeof getTerritoryRadiusForPlayer === 'function') {
+  territoryRadiusBefore = getTerritoryRadiusForPlayer(p);
+}
     p.tradeLog = [];
     var act  = p.action;
     var gain = totalGain(p);
@@ -294,13 +299,33 @@ if (act.build) {
     /* 식량 소비 */
     p.resources.food = Math.max(0, p.resources.food - Math.max(0, p.population-2));
 
-    /* 랜덤 이벤트 */
-    var ev = EVENTS[Math.floor(Math.random()*EVENTS.length)];
-    var applyEv = true;
-    if (G.diff==='easy' && ev.type==='bad'  && Math.random()<0.45) applyEv=false;
-    if (G.diff==='hard' && ev.type==='good' && Math.random()<0.30) applyEv=false;
+    /* 랜덤 이벤트: 항상 발생하지 않고 확률적으로 발생 */
+var ev = null;
+var fxStr = '변화 없음';
+var applyEv = false;
 
-    var fxStr = applyEv ? ev.fx(p) : '';
+var eventChance = 0.58;
+
+if (G.diff === 'easy') eventChance = 0.50;
+if (G.diff === 'hard') eventChance = 0.66;
+
+if (Math.random() < eventChance) {
+  ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+  applyEv = true;
+
+  if (G.diff === 'easy' && ev.type === 'bad' && Math.random() < 0.45) applyEv = false;
+  if (G.diff === 'hard' && ev.type === 'good' && Math.random() < 0.30) applyEv = false;
+
+  fxStr = applyEv ? ev.fx(p) : '사건이 있었지만 큰 영향은 없었습니다.';
+} else {
+  ev = {
+    id: 'none',
+    name: '평온한 한 턴',
+    emoji: '🌤️',
+    type: 'neutral',
+    desc: '이번 턴에는 특별한 사건이 일어나지 않았습니다.'
+  };
+}
 
     /* 동맹국에게 좋은 이벤트 공유 */
     if (applyEv && ev.type==='good' && p.allies && p.allies.length > 0) {
@@ -318,10 +343,27 @@ if (act.build) {
     /* 자원 음수 방지 */
     Object.keys(p.resources).forEach(function(r){ p.resources[r]=Math.max(0,p.resources[r]); });
 
-    log.push({
-      pid:p.id, pname:p.name, country:p.country, climate:p.climate,
-      ev: applyEv?ev:null, fx:fxStr, gain:gain
-    });
+    var territoryMsg = '';
+
+if (typeof getTerritoryRadiusForPlayer === 'function' && territoryRadiusBefore !== null) {
+  var territoryRadiusAfter = getTerritoryRadiusForPlayer(p);
+
+  if (territoryRadiusAfter > territoryRadiusBefore) {
+    territoryMsg = '영토가 확장되었습니다! 반경 ' + territoryRadiusBefore + ' → ' + territoryRadiusAfter;
+    fxStr += ' / ' + territoryMsg;
+  }
+}
+
+log.push({
+  pid: p.id,
+  pname: p.name,
+  country: p.country,
+  climate: p.climate,
+  ev: ev,
+  fx: fxStr,
+  gain: gain,
+  territoryMsg: territoryMsg
+});
     /* AI diplo 처리 */
     if (act.diplo && p.isAI) {
       makeDiplo(p.id, act.diplo.toId, act.diplo.type);
