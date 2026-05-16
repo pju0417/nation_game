@@ -858,22 +858,29 @@ function renderTileButton(tile, players, currentPlayerId) {
   html += ' title="' + safeText(title) + '"';
   html += ' aria-label="' + safeText(title) + '">';
 
+  // 1. 영토선: 소유자가 있는 타일에만 표시
   if (owner) {
     html += '<span class="hex-territory-line"></span>';
     html += '<span class="hex-territory-glow"></span>';
   }
 
+  // 2. 선택 효과: 선택한 타일에만 표시
   if (isSelected) {
     html += '<span class="hex-selection-pulse"></span>';
   }
 
+  // 3. 지형 아이콘
   html += '<span class="hex-icon">' + tileType.icon + '</span>';
+
+  // 4. 생산량 아이콘
   html += '<span class="hex-yield">' + getYieldIcon(tile) + '</span>';
 
+  // 5. 건물 아이콘
   if (tile.buildingId) {
     html += '<span class="hex-building-mark">' + getBuildingEmojiById(tile.buildingId) + '</span>';
   }
 
+  // 6. 수도 아이콘: 실제 참여 중인 국가의 수도에만 표시
   if (isOwnedCapital) {
     html += '<span class="hex-owner-mark">' + safeText(owner.emoji || '👑') + '</span>';
   }
