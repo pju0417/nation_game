@@ -326,31 +326,37 @@ function ensureButtonMapStyles() {
       'animation:hexPulse 1.4s ease-in-out infinite;' +
     '}' +
 
-    /*
-      선택된 타일 자체에는 box-shadow를 거의 주지 않습니다.
-      사각형처럼 보이는 문제를 막기 위해 선택 효과는 내부 span에서 처리합니다.
-    */
     '.hex-tile-btn.selected{' +
       'z-index:60!important;' +
-      'filter:brightness(1.08);' +
+      'filter:brightness(1.18);' +
     '}' +
 
     '.hex-selection-pulse{' +
       'position:absolute;' +
-      'inset:5px;' +
+      'inset:2px;' +
       'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
-      'border:3px solid rgba(240,192,64,.95);' +
-      'background:rgba(240,192,64,.08);' +
-      'box-shadow:inset 0 0 12px rgba(240,192,64,.65),0 0 12px rgba(240,192,64,.42);' +
+      'border:4px solid rgba(240,192,64,1);' +
+      'background:rgba(240,192,64,.18);' +
+      'box-shadow:inset 0 0 0 4px rgba(255,255,255,.45),inset 0 0 24px rgba(240,192,64,.95),0 0 18px rgba(240,192,64,.95),0 0 34px rgba(240,192,64,.65);' +
       'pointer-events:none;' +
       'z-index:7;' +
-      'animation:hexSelectPulse 1.35s ease-in-out infinite;' +
+      'animation:hexSelectPulse 1.25s ease-in-out infinite;' +
+    '}' +
+
+    '.hex-selection-pulse::after{' +
+      'content:"";' +
+      'position:absolute;' +
+      'inset:8px;' +
+      'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
+      'border:2px solid rgba(255,255,255,.70);' +
+      'background:rgba(255,255,255,.08);' +
+      'box-shadow:inset 0 0 12px rgba(255,255,255,.35);' +
     '}' +
 
     '@keyframes hexSelectPulse{' +
-      '0%{opacity:.35;transform:scale(.96);}' +
-      '50%{opacity:1;transform:scale(1.02);}' +
-      '100%{opacity:.35;transform:scale(.96);}' +
+      '0%{opacity:.55;transform:scale(.94);filter:brightness(1);}' +
+      '50%{opacity:1;transform:scale(1.04);filter:brightness(1.35);}' +
+      '100%{opacity:.55;transform:scale(.94);filter:brightness(1);}' +
     '}' +
 
     '@keyframes hexPulse{' +
