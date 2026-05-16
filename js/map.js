@@ -265,30 +265,30 @@ function ensureButtonMapStyles() {
       'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
       'background:var(--tile-color);' +
       'box-shadow:inset 0 0 0 2px rgba(255,255,255,.16),inset 0 -16px 22px rgba(0,0,0,.22),inset 0 10px 16px rgba(255,255,255,.12);' +
-      'transition:transform .08s ease, filter .08s ease, box-shadow .08s ease;' +
+      'transition:transform .08s ease, filter .08s ease;' +
       'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:none;overflow:hidden;' +
     '}' +
 
-    '.hex-tile-btn:hover{transform:translateY(-2px) scale(1.035);filter:brightness(1.12);z-index:40!important;}' +
+    '.hex-tile-btn:hover{' +
+      'transform:translateY(-2px) scale(1.035);' +
+      'filter:brightness(1.12);' +
+      'z-index:40!important;' +
+    '}' +
+
     '.hex-tile-btn:focus{' +
-  'outline:none!important;' +
-  'box-shadow:inherit;' +
-'}' +
+      'outline:none!important;' +
+    '}' +
 
-'.hex-tile-btn:focus-visible{' +
-  'outline:none!important;' +
-  'box-shadow:inherit;' +
-'}' +
+    '.hex-tile-btn:focus-visible{' +
+      'outline:none!important;' +
+    '}' +
 
-'.hex-tile-btn:active{' +
-  'outline:none!important;' +
-'}' +
+    '.hex-tile-btn:active{' +
+      'outline:none!important;' +
+    '}' +
 
-'.hex-tile-btn::-moz-focus-inner{' +
-  'border:0;' +
-'}' +
-    '.hex-tile-btn:focus,.hex-tile-btn:focus-visible{' +
-    'outline:none;' +
+    '.hex-tile-btn::-moz-focus-inner{' +
+      'border:0;' +
     '}' +
 
     '.hex-tile-btn.owned{' +
@@ -322,22 +322,62 @@ function ensureButtonMapStyles() {
       'z-index:22;' +
     '}' +
 
-    '.hex-tile-btn.current-capital{animation:hexPulse 1.4s ease-in-out infinite;}' +
-
-    '.hex-tile-btn.selected{' +
-      'box-shadow:inset 0 0 0 6px #f0c040,inset 0 0 0 11px rgba(255,255,255,.62),inset 0 0 24px rgba(240,192,64,.80),inset 0 -16px 22px rgba(0,0,0,.24);' +
-      'z-index:60!important;filter:brightness(1.16);' +
+    '.hex-tile-btn.current-capital{' +
+      'animation:hexPulse 1.4s ease-in-out infinite;' +
     '}' +
 
-    '@keyframes hexPulse{0%,100%{filter:brightness(1);}50%{filter:brightness(1.28);}}' +
+    /*
+      선택된 타일 자체에는 box-shadow를 거의 주지 않습니다.
+      사각형처럼 보이는 문제를 막기 위해 선택 효과는 내부 span에서 처리합니다.
+    */
+    '.hex-tile-btn.selected{' +
+      'z-index:60!important;' +
+      'filter:brightness(1.08);' +
+    '}' +
 
-    '.hex-icon{position:absolute;left:0;right:0;top:21px;text-align:center;font-size:18px;line-height:1;color:rgba(255,255,255,.92);text-shadow:0 1px 3px rgba(0,0,0,.65);pointer-events:none;z-index:3;}' +
-    '.hex-yield{position:absolute;right:15px;bottom:17px;font-size:12px;line-height:1;opacity:.86;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));pointer-events:none;z-index:3;}' +
+    '.hex-selection-pulse{' +
+      'position:absolute;' +
+      'inset:5px;' +
+      'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);' +
+      'border:3px solid rgba(240,192,64,.95);' +
+      'background:rgba(240,192,64,.08);' +
+      'box-shadow:inset 0 0 12px rgba(240,192,64,.65),0 0 12px rgba(240,192,64,.42);' +
+      'pointer-events:none;' +
+      'z-index:7;' +
+      'animation:hexSelectPulse 1.35s ease-in-out infinite;' +
+    '}' +
+
+    '@keyframes hexSelectPulse{' +
+      '0%{opacity:.35;transform:scale(.96);}' +
+      '50%{opacity:1;transform:scale(1.02);}' +
+      '100%{opacity:.35;transform:scale(.96);}' +
+    '}' +
+
+    '@keyframes hexPulse{' +
+      '0%,100%{filter:brightness(1);}' +
+      '50%{filter:brightness(1.28);}' +
+    '}' +
+
+    '.hex-icon{' +
+      'position:absolute;left:0;right:0;top:21px;text-align:center;font-size:18px;line-height:1;' +
+      'color:rgba(255,255,255,.92);text-shadow:0 1px 3px rgba(0,0,0,.65);pointer-events:none;z-index:8;' +
+    '}' +
+
+    '.hex-yield{' +
+      'position:absolute;right:15px;bottom:17px;font-size:12px;line-height:1;opacity:.86;' +
+      'filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));pointer-events:none;z-index:8;' +
+    '}' +
 
     '.hex-owner-mark{' +
       'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;' +
       'background:rgba(6,8,20,.88);display:flex;align-items:center;justify-content:center;font-size:14px;' +
-      'border:2px solid var(--owner-strong);box-shadow:0 0 12px var(--owner-soft);pointer-events:none;z-index:4;' +
+      'border:2px solid var(--owner-strong);box-shadow:0 0 12px var(--owner-soft);pointer-events:none;z-index:9;' +
+    '}' +
+
+    '.hex-building-mark{' +
+      'position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:24px;height:24px;border-radius:50%;' +
+      'background:rgba(6,8,20,.88);border:2px solid rgba(240,192,64,.85);display:flex;align-items:center;justify-content:center;' +
+      'font-size:14px;z-index:9;pointer-events:none;' +
     '}' +
 
     '.hex-country-label{' +
@@ -346,28 +386,18 @@ function ensureButtonMapStyles() {
       'box-shadow:0 4px 12px rgba(0,0,0,.28);text-shadow:0 1px 2px rgba(0,0,0,.7);' +
     '}' +
 
-    '.hex-info-box{margin-top:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.20);border-radius:12px;background:rgba(8,9,26,.92);color:#f6e7b5;font-size:13px;line-height:1.55;box-shadow:0 10px 24px rgba(0,0,0,.25);}' +
-    '.hex-info-title{font-weight:800;font-size:15px;margin-bottom:6px;}' +
+    '.hex-info-box{' +
+      'margin-top:10px;padding:12px 14px;border:1px solid rgba(255,255,255,.20);border-radius:12px;' +
+      'background:rgba(8,9,26,.92);color:#f6e7b5;font-size:13px;line-height:1.55;box-shadow:0 10px 24px rgba(0,0,0,.25);' +
+    '}' +
 
-    '.hex-map-footer{display:flex;justify-content:space-between;gap:10px;padding:9px 14px 12px;font-size:11px;color:rgba(210,225,245,.62);background:rgba(4,6,15,.38);}' +
+    '.hex-info-title{' +
+      'font-weight:800;font-size:15px;margin-bottom:6px;' +
+    '}' +
 
-     '.hex-building-mark{' +
-  'position:absolute;' +
-  'left:50%;' +
-  'bottom:10px;' +
-  'transform:translateX(-50%);' +
-  'width:24px;' +
-  'height:24px;' +
-  'border-radius:50%;' +
-  'background:rgba(6,8,20,.88);' +
-  'border:2px solid rgba(240,192,64,.85);' +
-  'display:flex;' +
-  'align-items:center;' +
-  'justify-content:center;' +
-  'font-size:14px;' +
-  'z-index:5;' +
-  'pointer-events:none;' +
-'}' +
+    '.hex-map-footer{' +
+      'display:flex;justify-content:space-between;gap:10px;padding:9px 14px 12px;font-size:11px;color:rgba(210,225,245,.62);background:rgba(4,6,15,.38);' +
+    '}' +
 
     '@media (max-width:768px){.hex-map-scroll{padding:12px;}.hex-map-header{align-items:flex-start;flex-direction:column;}.hex-map-badges{justify-content:flex-start;}}';
 
@@ -758,17 +788,17 @@ function renderTileButton(tile, players, currentPlayerId) {
   var owner = getPlayerById(players, tile.ownerPlayerId);
   var ownerColor = owner ? getPlayerColor(owner, owner.climate) : null;
 
-  /*
-    실제 참여 중인 국가의 수도인지 확인.
-    핵심:
-    - tile.isCapital만 보면, 게임에 참여하지 않는 기후의 수도도 표시됨
-    - 반드시 owner가 있고, 그 owner의 climate와 capitalClimate가 같아야 수도로 표시
-  */
   var isOwnedCapital = !!(
     owner &&
     tile.isCapital &&
     tile.capitalClimate &&
     owner.climate === tile.capitalClimate
+  );
+
+  var isSelected = !!(
+    SELECTED_TILE &&
+    SELECTED_TILE.row === tile.row &&
+    SELECTED_TILE.col === tile.col
   );
 
   var left = 30 + tile.col * HEX_X_GAP + (tile.row % 2) * (HEX_X_GAP / 2);
@@ -788,7 +818,7 @@ function renderTileButton(tile, players, currentPlayerId) {
     classes.push('current-capital');
   }
 
-  if (SELECTED_TILE && SELECTED_TILE.row === tile.row && SELECTED_TILE.col === tile.col) {
+  if (isSelected) {
     classes.push('selected');
   }
 
@@ -822,25 +852,22 @@ function renderTileButton(tile, players, currentPlayerId) {
   html += ' title="' + safeText(title) + '"';
   html += ' aria-label="' + safeText(title) + '">';
 
-  /*
-    영토선은 소유자가 있는 타일에만 표시.
-    단, 타일 색은 유지하고 선만 표시.
-  */
   if (owner) {
     html += '<span class="hex-territory-line"></span>';
     html += '<span class="hex-territory-glow"></span>';
   }
 
+  if (isSelected) {
+    html += '<span class="hex-selection-pulse"></span>';
+  }
+
   html += '<span class="hex-icon">' + tileType.icon + '</span>';
   html += '<span class="hex-yield">' + getYieldIcon(tile) + '</span>';
- if (tile.buildingId) {
-  html += '<span class="hex-building-mark">' + getBuildingEmojiById(tile.buildingId) + '</span>';
-}
 
-  /*
-    수도 아이콘은 실제 참여 중인 국가의 자기 수도에만 표시.
-    참여하지 않는 기후의 수도는 표시하지 않음.
-  */
+  if (tile.buildingId) {
+    html += '<span class="hex-building-mark">' + getBuildingEmojiById(tile.buildingId) + '</span>';
+  }
+
   if (isOwnedCapital) {
     html += '<span class="hex-owner-mark">' + safeText(owner.emoji || '👑') + '</span>';
   }
