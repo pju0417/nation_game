@@ -593,41 +593,101 @@ function syncTilesWithPlayers(players) {
 
 /* ─── 버튼 지도 전용 host 준비 ──────────────────── */
 function getOrCreateButtonMapHost() {
+  /*
+    지도 host를 최대한 안정적으로 찾거나 생성합니다.
+
+    우선순위:
+    1. 이미 있는 #worldMapButtonHost 사용
+    2. 예전 canvas #worldMap이 있으면 그 자리에 host 생성 후 canvas 제거
+    3. 새 지도 레이아웃의 .map-center-col 안에 host 생성
+    4. 마지막 fallback으로 #app 안에 host 생성
+  */
+
   var host = document.getElementById('worldMapButtonHost');
-  if (host) return host;
+
+  if (host) {
+    return host;
+  }
 
   var canvas = document.getElementById('worldMap');
-  if (!canvas) return null;
 
-  var parent = canvas.parentNode;
-  if (!parent) return null;
+  if (canvas && canvas.parentNode) {
+    host = document.createElement('div');
+    host.id = 'worldMapButtonHost';
 
-  host = document.createElement('div');
-  host.id = 'worldMapButtonHost';
+    canvas.parentNode.insertBefore(host, canvas);
+    canvas.remove();
 
-  parent.insertBefore(host, canvas);
-  canvas.remove();
+    return host;
+  }
 
-  return host;
+  var centerCol = document.querySelector('.map-center-col');
+
+  if (centerCol) {
+    host = document.createElement('div');
+    host.id = 'worldMapButtonHost';
+    centerCol.appendChild(host);
+
+    return host;
+  }
+
+  var app = document.getElementById('app');
+
+  if (app) {
+    host = document.createElement('div');
+    host.id = 'worldMapButtonHost';
+    app.appendChild(host);
+
+    return host;
+  }
+
+  return null;
 }
-
 /* ─── 버튼 지도 렌더링 ───────────────────────────── */
 function scheduleMapDraw(players, currentPlayerId) {
   _mapLastPlayers = players || [];
   _mapLastCurId = currentPlayerId;
 
   ensureButtonMapStyles();
+
+  /*
+    턴이 바뀌면 인구, 영토, 건물 배치가 바뀔 수 있으므로
+    같은 지도 프로필이어도 타일 데이터를 다시 동기화합니다.
+  */
   buildMapTiles(false);
   syncTilesWithPlayers(_mapLastPlayers);
 
+  /*
+    render() 직후 DOM이 아직 안정화되지 않았을 수 있어
+    1차, 2차로 나누어 렌더링합니다.
+    두 번째 턴부터 지도가 사라지는 문제를 방지합니다.
+  */
   setTimeout(function() {
     renderButtonHexMap(_mapLastPlayers, _mapLastCurId);
   }, 0);
+
+  setTimeout(function() {
+    var host = getOrCreateButtonMapHost();
+
+    if (host && host.innerHTML.trim() === '') {
+      renderButtonHexMap(_mapLastPlayers, _mapLastCurId);
+    }
+
+    if (!host) {
+      renderButtonHexMap(_mapLastPlayers, _mapLastCurId);
+    }
+  }, 50);
 }
 
 function renderButtonHexMap(players, currentPlayerId) {
   var host = getOrCreateButtonMapHost();
-  if (!host) return;
+
+  if (!host) {
+    console.warn('지도 host를 찾거나 만들 수 없습니다.');
+    return;
+  }
+
+  players = players || [];
 
   var profile = CURRENT_MAP_PROFILE || getMapProfile();
   var map = profile.map;
@@ -686,7 +746,10 @@ function renderButtonHexMap(players, currentPlayerId) {
 
   if (SELECTED_TILE) {
     var selected = getTile(SELECTED_TILE.row, SELECTED_TILE.col);
-    if (selected) showTileInfo(selected, players);
+
+    if (selected) {
+      showTileInfo(selected, players);
+    }
   }
 }
 
